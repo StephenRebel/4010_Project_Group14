@@ -1,6 +1,10 @@
 import numpy as np
 import gymnasium as gym
 import pretty_midi
+import matplotlib.pyplot as plt
+from music21 import stream, note, meter, tempo
+import threading
+
 
 class RLMusicBotEnv(gym.Env):
     def __init__(self, bars: int = 4):
@@ -18,7 +22,7 @@ class RLMusicBotEnv(gym.Env):
         self.volumes = [0.4, 0.6, 0.8, 1.0]
         self.n_volumes = len(self.volumes)
 
-        self.pitches = list(range(0, 127))  # C4–C5
+        self.pitches = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83]  # 2 octave c major scale
         self.rest_action = len(self.pitches)
         self.n_pitches = len(self.pitches) + 1  # +1 for rest
 
@@ -91,9 +95,50 @@ class RLMusicBotEnv(gym.Env):
         pm.write(filename)
         print(f"Saved generated music to {filename}")
 
+def init_live_plot():
+    plt.ion()
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.set_xlabel("Time (beats)")
+    ax.set_ylabel("MIDI Pitch")
+    ax.set_title("RL Musicbot Note Generation")
+    ax.set_ylim(55, 90)
+    ax.set_xlim(0, 4 * 4)
+    return fig, ax
+
+def update_live_plot(ax, current_time, pitch, duration):
+    if pitch is not None:
+        ax.hlines(pitch, current_time, current_time + duration, colors='black', linewidth=4)
+        plt.draw()
+        plt.pause(duration * 0.4)
+
+# music21 sheet
+def show_final_sheet(musical_score, bpm=120):
+    s = stream.Stream()
+    s.append(tempo.MetronomeMark(number=bpm))
+    s.append(meter.TimeSignature('4/4'))
+
+    for bar in musical_score:
+        for (pitch, duration, volume) in bar:
+            if pitch is None:
+                n = note.Rest(quarterLength=duration)
+            else:
+                n = note.Note(pitch, quarterLength=duration)
+            s.append(n)
+
+    def open_musescore():
+        s.show()  # s.show freezes the python demo window, so thread it to avoid
+
+    # program will stay alive while musescore is open
+    t = threading.Thread(target=open_musescore)
+    t.start()
+
 
 env = RLMusicBotEnv()
 obs, _ = env.reset()
+
+fig, ax = init_live_plot()
+current_time = 0.0
+
 done = False
 
 while not done:
@@ -113,8 +158,17 @@ while not done:
 
     obs, reward, done, _, _ = env.step(action)
 
+    pitch = new_note[0]
+    update_live_plot(ax, current_time, pitch, duration)
+    current_time += duration
+
 
 print(env._musical_score)
 
 # Save to MIDI
 env.save_to_midi("random_song.mid")
+show_final_sheet(env._musical_score)
+
+# Keep the Matplotlib window alive properly, also needed so the python window doesnt freeze due to s.show()
+plt.ioff()
+plt.show()
