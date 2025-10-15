@@ -2,7 +2,9 @@
 Stephen:
 
 Danial:
-
+   - Helped setup gymnasium environment
+   - Helped generate random notes
+   - Found a way to visualize the notes
 
 Saagar:
    - Doing some further research in regard to creating music
