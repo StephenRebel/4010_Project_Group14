@@ -1,5 +1,9 @@
 
 Stephen:
+   - Initialized the repository and set up configurations
+   - Created initial gymnasium file and requirements
+   - Working on simplifying and formalizing project requirements and design from planning file
+   - Discussing project outlook with groupmates.
 
 Danial:
    - Helped setup gymnasium environment
