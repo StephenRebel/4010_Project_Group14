@@ -21,3 +21,8 @@ Sharav:
 
 
 Drax:
+   - bug fix for sheet music set in C maj
+   - started helper functions for RL 
+   - research into music theory 
+   - will continue to research music theory + consult a friend who graduated in music theory
+   - start to develop some rewards/weights for certain notes on certain rythms depending on first notes of bars
