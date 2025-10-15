@@ -8,6 +8,8 @@ Saagar:
    - Doing some further research in regard to creating music
    - getting familiar with the env
    - starting the code process
+   - going to look at the reward structures
+   - going to look at how we can evaluate a composition once generated or during generation
 
 Sharav:
 
