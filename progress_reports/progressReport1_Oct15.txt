@@ -18,8 +18,10 @@ Saagar:
    - going to look at how we can evaluate a composition once generated or during generation
 
 Sharav:
-
-
+   - Helped with researching into music theory
+   - Created display for real-time demo
+   - Created final visualization for sheet music at the end of generation
+   - Helped with pitch for note generation
 Drax:
    - bug fix for sheet music set in C maj
    - started helper functions for RL 
