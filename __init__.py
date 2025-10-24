@@ -27,6 +27,26 @@ class RLMusicBotEnv(gym.Env):
         self.pitches = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83]  # 2 octave c major scale
         self.rest_action = len(self.pitches)
         self.n_pitches = len(self.pitches) + 1  # +1 for rest
+        
+        # Chord definitions
+        self.chords = {
+            'C': [60, 64, 67, 72, 76, 79],  # C, E, G
+            'F': [65, 69, 60, 77, 81, 72],  # F, A, C 
+            'G': [67, 71, 62, 79, 83, 74]   # G, B, D
+        }
+
+        # Chord progressions weights
+        self.progression_weights = {
+            ('C', 'C'): 0.3,  # stay on C
+            ('C', 'F'): 1.0,  # C to F (strong)
+            ('C', 'G'): 1.0,  # C to G (strong)
+            ('F', 'C'): 0.8,  # F to C
+            ('F', 'G'): 0.9,  # F to G
+            ('F', 'F'): 0.3,  # stay on F
+            ('G', 'C'): 1.0,  # G to C (resolution)
+            ('G', 'F'): 0.7,  # G to F
+            ('G', 'G'): 0.3,  # stay on G
+        }
 
         # Spaces
         self.action_space = gym.spaces.MultiDiscrete([
@@ -34,11 +54,18 @@ class RLMusicBotEnv(gym.Env):
             self.n_durations,
             self.n_volumes
         ])
+
+        # TODO: Define a more meaningful observation space
+        obs_dimensions = 4 + 3 + 14 + 14
         self.observation_space = gym.spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32)
 
         # Internal state
         self._musical_score = []
         self.current_bar = 0
+        self.last_pitch = None
+        self.last_duration = 0.0
+        self.current_bar_chord = None
+        self.prev_bar_chord = None
 
     def _map_action_to_note(self, action):
         pitch_idx, duration_idx, volume_idx = action
@@ -51,15 +78,53 @@ class RLMusicBotEnv(gym.Env):
         super().reset(seed=seed)
         self._musical_score = [[] for _ in range(self.bars)]
         self.current_bar = 0
+        self.last_pitch = None
+        self.last_duration = 0.0
+        self.current_bar_chord = None
+        self.prev_bar_chord = None
         state = np.zeros((1,), dtype=np.float32)
         return state, {}
     
     def _get_obs(self):
         return np.array([self._musical_score])
+    
+    # reward function components
+    # essentially we want to reward
+    # 1. notes that fit the scale
+    # 2. notes that fit the chord
+    # 3. rhythmic variety
+    # 4. repetition of good motifs
+    def _detect_chord(self, bar_notes):
+        # Detecting which chord (C, F, or G) is most prominent in the bar
+        if not bar_notes:
+            return None
+        
+        # get pitches from notes
+        pitches = [note[0] for note in bar_notes if note[0] is not None]
+        if not pitches:
+            return None
+        
+        # counting chord scores and finding best match
+        chord_scores = {}
+        for chord_name, chord_pitches in self.chords.items():
+            score = sum(1 for p in pitches if p in chord_pitches)
+            chord_scores[chord_name] = score
+        
+        # just in case no chord matches
+        max_score = max(chord_scores.values())
+        if max_score == 0:
+            return None
+        
+        # return the chord with highest score
+        return max(chord_scores, key=chord_scores.get)
 
     def step(self, action):
         note = self._map_action_to_note(action)
+        pitch, duration = note
+        
         self._musical_score[self.current_bar].append(note)
+        self.last_pitch = pitch
+        self.last_duration = duration
 
         total_duration = sum(n[1] for n in self._musical_score[self.current_bar] if n[0] is not None)
         if total_duration >= self.beats_per_bar:
