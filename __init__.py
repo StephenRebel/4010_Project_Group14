@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from music21 import key as m21key, pitch as m21pitch
 from music21 import stream, note, meter, tempo
 import threading
+from collections import Counter
 
 
 class RLMusicBotEnv(gym.Env):
@@ -17,7 +18,7 @@ class RLMusicBotEnv(gym.Env):
         self.scale = "C"
 
         # Note options
-        self.durations = [ 0.25, 0.5, 1.0, 2.0, 4.0]
+        self.durations = [0.25, 0.5, 1.0, 2.0, 4.0]
         self.n_durations = len(self.durations)
 
         self.volumes = [0.4, 0.6, 0.8, 1.0]
@@ -50,8 +51,8 @@ class RLMusicBotEnv(gym.Env):
         super().reset(seed=seed)
         self._musical_score = [[] for _ in range(self.bars)]
         self.current_bar = 0
-        obs = np.zeros((1,), dtype=np.float32)
-        return obs, {}
+        state = np.zeros((1,), dtype=np.float32)
+        return state, {}
     
     def _get_obs(self):
         return np.array([self._musical_score])
@@ -65,11 +66,91 @@ class RLMusicBotEnv(gym.Env):
             self.current_bar += 1
 
         done = self.current_bar >= self.bars
-        reward = 0.0
-        obs = np.zeros((1,), dtype=np.float32)
+        
+        # For now reward structure 0 unless at terminal state, i.e. only reward
+        if done:
+            reward = self._compute_reward()
+        else:
+            reward = 0.0
+
+        state = np.zeros((1,), dtype=np.float32)
         info = {}
-        return obs, reward, done, False, info
-    
+        return state, reward, done, False, info
+
+    # Function to compute the reward for the current state of the environment
+    # Combination of scale adherence, repetition, and rhythm.    
+    def _compute_reward(self):
+        # Rhythm reward section, may have to look at datasets of MIDI for some of these parameters
+        subdivisions = 4 # allowing 16th notes above
+        min_note_duration = 0.25
+
+        # Tunable parameters, some maybe from MIDI datasets
+        target_syncopation = 0.20 # Syncopation refers to empahsis on notes in offbeat positions
+        max_expected_notes_bar = 12.0
+        min_expected_notes_bar = 1.0 # Number of notes we expect to see in a typical bar.
+        
+        max_entropy = np.log(subdivisions)
+        target_entropy = 0.7 * max_entropy # Variety of note placement in bar
+
+        notes_played = [] # List of when notes are played
+        notes_per_bar = []
+
+        current_sub = 0
+        for bar in self._musical_score:
+            count_in_bar = 0
+            for (pitch, duration, volume) in bar:
+                sub_divs_note = int(duration * subdivisions)
+                if pitch is not None:
+                    notes_played.append(current_sub)
+                    count_in_bar += 1
+                current_sub += sub_divs_note
+            notes_per_bar.append(count_in_bar)
+
+        total_notes_played = len(notes_played)
+        # If no notes played that's bad
+        if total_notes_played == 0:
+            return -1.0
+
+        # Notes played on interger (quarter note) beats, and notes played off intergers beats
+        quarter_beat_notes = sum(1 for idx in notes_played if (idx % subdivisions) == 0)
+        quarter_beat_ratio = quarter_beat_notes / total_notes_played
+        non_qbn_ratio = 1 - quarter_beat_ratio
+
+        # Create a histogram of when notes occur in bars to compute entropy, how simple vs how complex rhythms tend to be.
+        note_slots = [int(idx % subdivisions) for idx in notes_played]
+        slots_count = Counter(note_slots)
+        slot_histogram = np.array([slots_count.get(i, 0) for i in range(subdivisions)], dtype=float)
+        slot_histogram = slot_histogram / slot_histogram.sum()
+
+        entropy = -np.sum(slot_histogram * np.log(slot_histogram + 1e-9))
+        entropy_score = 1.0 - abs(entropy - target_entropy) / (max_entropy) # Should be 0 to 1
+
+        # https://en.wikipedia.org/wiki/Time_point
+        # Interonset interval, time between beginnings of notes and successive notes. Quantifies rhytmic regularity
+        if total_notes_played >= 2:
+            played_arr = np.array(notes_played, dtype=float)
+            ioi = np.diff(played_arr)
+            ioi_mean = float(np.mean(ioi))
+            ioi_var = float(np.var(ioi))
+            ioi_stability = 1.0 - (ioi_var / (ioi_mean ** 2 * ioi_var)) # should be 0 to 1
+        else:
+            ioi_stability = 0.5
+
+        # Note density, are we playing a reasonable amount
+        avg_notes_per_bar = float(np.mean(notes_per_bar)) if len(notes_per_bar) > 0 else 0.0
+        expect_avg_npb = (min_expected_notes_bar + max_expected_notes_bar) / 2
+        note_density_score = 1.0 - (abs(avg_notes_per_bar - expect_avg_npb) / (max_expected_notes_bar - min_expected_notes_bar)) # should be 0 to 1
+
+        # Syncopation score, playing notes in off beats
+        syncopation_score = 1.0 - (abs(non_qbn_ratio - target_syncopation) / (1.0 + target_syncopation)) # should be 0 to 1
+
+        weights = np.array([1.8, 1.2, 0.9, 0.8, 1.0])
+        scores = np.array([quarter_beat_ratio, ioi_stability, entropy_score, note_density_score, syncopation_score])
+
+        rhythm_reward = float(np.dot(scores, weights))
+
+        return (1/3) * rhythm_reward # TODO weighted average of all our reward signals
+
     def save_to_midi(self, filename="generated_music.mid", tempo=120):
         pm = pretty_midi.PrettyMIDI()
         instrument = pretty_midi.Instrument(program=0)  # Acoustic Grand Piano
@@ -170,8 +251,8 @@ while not done:
     update_live_plot(ax, current_time, pitch, duration)
     current_time += duration
 
-
 print(env._musical_score)
+print(reward)
 
 # Save to MIDI
 env.save_to_midi("random_song.mid")

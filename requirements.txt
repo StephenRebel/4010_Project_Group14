@@ -1,1 +1,4 @@
 gymnasium==1.2.1
+pretty-midi==0.2.11
+matplotlib==3.10.7
+music21==9.9.1
