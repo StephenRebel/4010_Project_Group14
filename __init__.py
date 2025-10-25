@@ -120,7 +120,7 @@ class RLMusicBotEnv(gym.Env):
 
     def step(self, action):
         note = self._map_action_to_note(action)
-        pitch, duration = note
+        pitch, duration, volume = note
         
         self._musical_score[self.current_bar].append(note)
         self.last_pitch = pitch
