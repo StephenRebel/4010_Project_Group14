@@ -241,8 +241,8 @@ class RLMusicBotEnv(gym.Env):
                     continue
                 total_notes += 1
                 # Scale fit - should always fit since gen is in C Maj
-                if (pitch % 12) in [0, 2, 4, 5, 7, 9, 11]:  # C major pitch classes
-                    harmony_score += 1.0
+                # if (pitch % 12) in [0, 2, 4, 5, 7, 9, 11]:  # C major pitch classes
+                #     harmony_score += 1.0
                 # Chord fit - if its in the current bar chord
                 if pitch in chord_pitches:
                     harmony_score += 2.0
