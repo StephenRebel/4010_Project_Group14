@@ -4,6 +4,10 @@ Stephen:
 Danial:
 
 Saagar:
+   - building reward scheme for our RL Music Bot
+   - implemented the rhythm reward scheme 
+   - building the infrastructure for the other two (melody and repetition)
+   - going to be implementing the chord detection system 
 
 Sharav:
 
