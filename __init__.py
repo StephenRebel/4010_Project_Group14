@@ -220,7 +220,41 @@ class RLMusicBotEnv(gym.Env):
 
         rhythm_reward = float(np.dot(scores, weights))
 
-        return (1/3) * rhythm_reward # TODO weighted average of all our reward signals
+        # Harmony reward
+        harmony_score = 0.0
+        total_notes = 0
+
+        for bar_idx, bar in enumerate(self._musical_score):
+            chord_name = self._detect_chord(bar)
+            if chord_name is None:
+                continue
+
+            chord_pitches = self.chords[chord_name]
+            next_chord_pitches = []
+            if bar_idx + 1 < len(self._musical_score):
+                next_chord = self._detect_chord(self._musical_score[bar_idx + 1])
+                if next_chord:
+                    next_chord_pitches = self.chords[next_chord]
+
+            for (pitch, duration, volume) in bar:
+                if pitch is None:
+                    continue
+                total_notes += 1
+                # Scale fit - should always fit since gen is in C Maj
+                if (pitch % 12) in [0, 2, 4, 5, 7, 9, 11]:  # C major pitch classes
+                    harmony_score += 1.0
+                # Chord fit - if its in the current bar chord
+                if pitch in chord_pitches:
+                    harmony_score += 2.0
+                # Smooth transition - if it happens to be a transition note that works for both bars
+                if next_chord_pitches and pitch in next_chord_pitches:
+                    harmony_score += 0.5
+
+        if total_notes > 0:
+            harmony_score /= total_notes
+        
+        final_reward = (1/2) * rhythm_reward + (1/2) * harmony_score
+        return final_reward
 
     def save_to_midi(self, filename="generated_music.mid", tempo=120):
         pm = pretty_midi.PrettyMIDI()
@@ -322,7 +356,9 @@ while not done:
     update_live_plot(ax, current_time, pitch, duration)
     current_time += duration
 
+print("musical score: ")
 print(env._musical_score)
+print("reward: ")
 print(reward)
 
 # Save to MIDI
