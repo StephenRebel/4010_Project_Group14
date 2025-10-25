@@ -125,10 +125,15 @@ class RLMusicBotEnv(gym.Env):
         self._musical_score[self.current_bar].append(note)
         self.last_pitch = pitch
         self.last_duration = duration
-
-        total_duration = sum(n[1] for n in self._musical_score[self.current_bar] if n[0] is not None)
+        
+        # Check if we need to move to next bar
+        # If total duration in current bar exceeds beats_per_bar, move to next bar
+        total_duration = sum(n[1] for n in self._musical_score[self.current_bar])
         if total_duration >= self.beats_per_bar:
+            self.prev_bar_chord = self.current_bar_chord
             self.current_bar += 1
+            if self.current_bar < self.bars:
+                self.current_bar_chord = None
 
         done = self.current_bar >= self.bars
         
@@ -139,7 +144,7 @@ class RLMusicBotEnv(gym.Env):
             reward = 0.0
 
         state = np.zeros((1,), dtype=np.float32)
-        info = {}
+        info = {'current_chord': self.current_bar_chord}
         return state, reward, done, False, info
 
     # Function to compute the reward for the current state of the environment
