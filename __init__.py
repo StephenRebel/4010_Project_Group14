@@ -93,8 +93,9 @@ class RLMusicBotEnv(gym.Env):
     # essentially we want to reward
     # 1. notes that fit the scale
     # 2. notes that fit the chord
-    # 3. rhythmic variety
-    # 4. repetition of good motifs
+    # 3. chord progression
+    # 4. rhythmic variety
+    # 5. repetition of good motifs
     def _detect_chord(self, bar_notes):
         # Detecting which chord (C, F, or G) is most prominent in the bar
         if not bar_notes:
@@ -252,8 +253,30 @@ class RLMusicBotEnv(gym.Env):
 
         if total_notes > 0:
             harmony_score /= total_notes
+
+        # Chord progression reward
+        bar_chords = [self._detect_chord(bar) for bar in self._musical_score]
+
+        progression_score = 0.0
+        valid_transitions = 0
+
+        for i in range(len(bar_chords) - 1):
+            prev_chord = bar_chords[i]
+            next_chord = bar_chords[i + 1]
+            if prev_chord is None or next_chord is None:
+                continue
+            valid_transitions += 1
+            weight = self.progression_weights.get((prev_chord, next_chord), 0.1)
+            progression_score += weight
+
+        if valid_transitions > 0:
+            progression_score /= valid_transitions
         
-        final_reward = (1/2) * rhythm_reward + (1/2) * harmony_score
+        final_reward = (
+            0.3 * rhythm_reward +
+            0.4 * harmony_score +
+            0.3 * progression_score
+        )
         return final_reward
 
     def save_to_midi(self, filename="generated_music.mid", tempo=120):
