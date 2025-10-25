@@ -1,0 +1,14 @@
+
+Stephen:
+
+Danial:
+
+Saagar:
+
+Sharav:
+
+Drax:
+   - minor bug fix in steps
+   - implementation of harmonic convergence
+   - look more into "half-steps" transition notes and exploration values
+

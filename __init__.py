@@ -36,12 +36,13 @@ class RLMusicBotEnv(gym.Env):
         }
 
         # Chord progressions weights
+        # MOST Common progression - C F G C
         self.progression_weights = {
             ('C', 'C'): 0.3,  # stay on C
             ('C', 'F'): 1.0,  # C to F (strong)
-            ('C', 'G'): 1.0,  # C to G (strong)
+            ('C', 'G'): 9.0,  # C to G (strong)
             ('F', 'C'): 0.8,  # F to C
-            ('F', 'G'): 0.9,  # F to G
+            ('F', 'G'): 1.0,  # F to G
             ('F', 'F'): 0.3,  # stay on F
             ('G', 'C'): 1.0,  # G to C (resolution)
             ('G', 'F'): 0.7,  # G to F
