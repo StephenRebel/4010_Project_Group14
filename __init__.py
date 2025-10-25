@@ -91,29 +91,31 @@ class RLMusicBotEnv(gym.Env):
     
     # reward function components
     # essentially we want to reward
-    # 1. notes that fit the scale
-    # 2. notes that fit the chord
-    # 3. chord progression
-    # 4. rhythmic variety
-    # 5. repetition of good motifs
     def _detect_chord(self, bar_notes):
         # Detecting which chord (C, F, or G) is most prominent in the bar
+        # bar_notes is a list of (pitch, duration, volume) tuples
         if not bar_notes:
             return None
         
         # get pitches from notes
-        pitches = [note[0] for note in bar_notes if note[0] is not None]
+        pitches = [note[0] for note in bar_notes if note[0] is not None]   # ignore rests
+
+        # if no pitches, return None
         if not pitches:
             return None
         
         # counting chord scores and finding best match
         chord_scores = {}
+
+        # scoring each chord
         for chord_name, chord_pitches in self.chords.items():
-            score = sum(1 for p in pitches if p in chord_pitches)
-            chord_scores[chord_name] = score
+            score = sum(1 for p in pitches if p in chord_pitches)  # simple count of tones in chord
+            chord_scores[chord_name] = score  # store the score
         
         # just in case no chord matches
         max_score = max(chord_scores.values())
+
+        # if no chord has any score, return None
         if max_score == 0:
             return None
         
