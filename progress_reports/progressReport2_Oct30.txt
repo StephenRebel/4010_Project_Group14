@@ -10,6 +10,9 @@ Saagar:
    - going to be implementing the chord detection system 
 
 Sharav:
+   - Helped with building reward scheme for RL Music Bot
+   - Implemented repetition reward scheme
+   - Balanced weights for rewards
 
 Drax:
    - minor bug fix in steps
