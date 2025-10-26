@@ -7,7 +7,7 @@ This webpage gives some details on installing the program: https://musescore.org
 
 Run the following command in a python interactive repl to configure the necessary paths:
 
-python```
+```python
 import music21
 music21.mainConfigure()
 ```
