@@ -18,15 +18,15 @@ class RLMusicBotEnv(gym.Env):
         self.scale = "C"
 
         # Note options
+        self.pitches = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83]  # 2 octave c major scale
+        self.rest_action = len(self.pitches)
+        self.n_pitches = len(self.pitches) + 1  # +1 for rest
+
         self.durations = [0.25, 0.5, 1.0, 2.0, 4.0]
         self.n_durations = len(self.durations)
 
         self.volumes = [0.4, 0.6, 0.8, 1.0]
         self.n_volumes = len(self.volumes)
-
-        self.pitches = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83]  # 2 octave c major scale
-        self.rest_action = len(self.pitches)
-        self.n_pitches = len(self.pitches) + 1  # +1 for rest
         
         # Chord definitions
         self.chords = {
@@ -56,9 +56,10 @@ class RLMusicBotEnv(gym.Env):
             self.n_volumes
         ])
 
-        # TODO: Define a more meaningful observation space
-        obs_dimensions = 4 + 3 + 14 + 14
-        self.observation_space = gym.spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32)
+        #Define the observation space: An np array of bars (array) of notes (array), contains indices NOT values
+        self.MAX_NOTES_PER_BAR = 16
+        highs = [self.n_pitches-1, self.n_durations-1, self.n_volumes-1]
+        self.observation_space = gym.spaces.MultiDiscrete([highs] * self.MAX_NOTES_PER_BAR * bars)
 
         # Internal state
         self._musical_score = []
@@ -86,8 +87,22 @@ class RLMusicBotEnv(gym.Env):
         state = np.zeros((1,), dtype=np.float32)
         return state, {}
     
+    #Get current observation space
     def _get_obs(self):
-        return np.array([self._musical_score])
+        # Prepare an empty array of indices
+        obs = np.zeros((self.bars, self.MAX_NOTES_PER_BAR, 3), dtype=np.int32)
+        
+        # Iterate over bars
+        for i, bar in enumerate(self._musical_score[:self.bars]):
+            for j, (pitch, duration, volume) in enumerate(bar[:self.MAX_NOTES_PER_BAR]):
+                # Convert pitch, duration, volume to indices
+                pitch_i = self.pitches.index(pitch) if pitch in self.pitches else self.rest_action
+                duration_i = self.durations.index(duration)
+                volume_i = self.volumes.index(volume)
+                
+                obs[i, j] = [pitch_i, duration_i, volume_i]
+        
+        return obs
     
     # reward function components
     # essentially we want to reward
@@ -147,9 +162,11 @@ class RLMusicBotEnv(gym.Env):
         else:
             reward = 0.0
 
-        state = np.zeros((1,), dtype=np.float32)
+        obs = self._get_obs()
         info = {'current_chord': self.current_bar_chord}
-        return state, reward, done, False, info
+        #View obs
+        #print(f"\nStep Observation (bar x note x [pitch,dur,vol]):\n{obs}")
+        return obs, reward, done, False, info
 
     # Function to compute the reward for the current state of the environment
     # Combination of scale adherence, repetition, and rhythm.    
