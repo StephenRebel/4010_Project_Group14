@@ -273,12 +273,49 @@ class RLMusicBotEnv(gym.Env):
 
         if valid_transitions > 0:
             progression_score /= valid_transitions
-        
+
+        # Repetition reward
+        sequence = []
+        for bar in self._musical_score:
+            for (pitch, duration, volume) in bar:
+                if pitch is not None:  # skip rests
+                    sequence.append((pitch, duration))
+
+        repetition_score = 0.0
+        if len(sequence) >= 4:
+            total_weight = 0.0
+
+            # Check for multiple n-gram sizes (2, 3 ,4)
+            # weights slightly favor shorter motifs of 2 or 3 notes
+            for n, weight in [(2, 0.4), (3, 0.4), (4, 0.2)]:
+                if len(sequence) < n * 2: # sequence has to be long enough for us to check repeats
+                    continue
+
+                # Extract all of the length n  subsequences and count the occurences of each n-gram
+                ngrams = [tuple(sequence[i:i+n]) for i in range(len(sequence) - n + 1)]
+                counts = Counter(ngrams)
+                # Count how many motifs repeat more than once
+                repeated = sum(1 for c in counts.values() if c > 1)
+                repetition_ratio = repeated / len(counts)
+
+                # Scaling should be nonlinear as we still should reward smaller repetitions
+                score_n = repetition_ratio ** 0.5
+                # Weighted sum of the repetition scores across n
+                repetition_score += weight * score_n
+                total_weight += weight
+
+            if total_weight > 0:
+                repetition_score /= total_weight
+        else:
+            repetition_score = 0.0
+
         final_reward = (
-            0.3 * rhythm_reward +
-            0.4 * harmony_score +
-            0.3 * progression_score
+            0.27 * rhythm_reward +
+            0.35 * harmony_score +
+            0.28 * progression_score +
+            0.1 * repetition_score
         )
+
         return final_reward
 
     def save_to_midi(self, filename="generated_music.mid", tempo=120):
