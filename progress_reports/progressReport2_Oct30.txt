@@ -2,6 +2,8 @@
 Stephen:
 
 Danial:
+   - Implemented the observation space
+   - Cleaned up code a bit/fixed small issues
 
 Saagar:
    - building reward scheme for our RL Music Bot

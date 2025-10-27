@@ -76,7 +76,7 @@ class RLMusicBotEnv(gym.Env):
         volume = self.volumes[volume_idx]
         return (pitch, duration, volume)
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None):
         super().reset(seed=seed)
         self._musical_score = [[] for _ in range(self.bars)]
         self.current_bar = 0
@@ -84,8 +84,8 @@ class RLMusicBotEnv(gym.Env):
         self.last_duration = 0.0
         self.current_bar_chord = None
         self.prev_bar_chord = None
-        state = np.zeros((1,), dtype=np.float32)
-        return state, {}
+        obs = self._get_obs()
+        return obs, {}
     
     #Get current observation space
     def _get_obs(self):
@@ -138,6 +138,8 @@ class RLMusicBotEnv(gym.Env):
         return max(chord_scores, key=chord_scores.get)
 
     def step(self, action):
+
+        #Get note from action space
         note = self._map_action_to_note(action)
         pitch, duration, volume = note
         
@@ -412,23 +414,25 @@ obs, _ = env.reset()
 fig, ax = init_live_plot()
 current_time = 0.0
 
+
 done = False
-
 while not done:
-    remaining = 4 - sum([note[1] for note in env._musical_score[env.current_bar]])
-    if remaining <= 0:
-        env.current_bar += 1
-        if env.current_bar >= env.bars:
-            break
-        continue
 
+    #Calculate how many beats left in bar
+    remaining = 4 - sum([note[1] for note in env._musical_score[env.current_bar]])
+    if env.current_bar >= env.bars:
+        break
+
+    #Pick action
     action = env.action_space.sample()
     new_note = env._map_action_to_note(action)
     duration = new_note[1]
 
+    #Filter out notes that don't fit
     if duration > remaining:
         continue
 
+    #Step
     obs, reward, done, _, _ = env.step(action)
 
     pitch = new_note[0]
