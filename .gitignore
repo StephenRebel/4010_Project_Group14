@@ -3,3 +3,6 @@
 
 # Ignore song output files
 random_song.mid
+
+# Ignore code
+code.zip

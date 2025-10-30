@@ -1,15 +1,9 @@
 import numpy as np
 import gymnasium as gym
-import pretty_midi
-import matplotlib.pyplot as plt
-from music21 import key as m21key, pitch as m21pitch
-from music21 import stream, note, meter, tempo
-import threading
 from collections import Counter
 
-
 class RLMusicBotEnv(gym.Env):
-    def __init__(self, bars: int = 4):
+    def __init__(self, bars: int = 4, render_mode: str = None):
         super(RLMusicBotEnv, self).__init__()
 
         # Config
@@ -69,6 +63,12 @@ class RLMusicBotEnv(gym.Env):
         self.current_bar_chord = None
         self.prev_bar_chord = None
 
+        # Rednering
+        self.render_mode = render_mode
+        self.plot = None
+        self.ax = None
+        self.clock = 0.5
+
     def _map_action_to_note(self, action):
         pitch_idx, duration_idx, volume_idx = action
         pitch = None if pitch_idx == self.rest_action else self.pitches[pitch_idx]
@@ -78,6 +78,7 @@ class RLMusicBotEnv(gym.Env):
 
     def reset(self, seed=None):
         super().reset(seed=seed)
+
         self._musical_score = [[] for _ in range(self.bars)]
         self.current_bar = 0
         self.last_pitch = None
@@ -85,6 +86,9 @@ class RLMusicBotEnv(gym.Env):
         self.current_bar_chord = None
         self.prev_bar_chord = None
         obs = self._get_obs()
+
+        self.close()
+
         return obs, {}
     
     #Get current observation space
@@ -163,6 +167,9 @@ class RLMusicBotEnv(gym.Env):
             reward = self._compute_reward()
         else:
             reward = 0.0
+
+        if self.render_mode == "human":
+            self.render()
 
         obs = self._get_obs()
         info = {'current_chord': self.current_bar_chord}
@@ -337,7 +344,64 @@ class RLMusicBotEnv(gym.Env):
 
         return final_reward
 
+    def _init_live_plot(self):
+            import matplotlib.pyplot as plt
+
+            plt.ion()
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.set_xlabel("Time (beats)")
+            ax.set_ylabel("MIDI Pitch")
+            ax.set_title("RL Musicbot Note Generation")
+            ax.set_ylim(55, 90)
+            ax.set_xlim(0, self.bars * self.beats_per_bar)
+            # ax.grid(True, which="both", ls=":", alpha=0.5)
+            return fig, ax
+
+    def render(self):
+        # Display matplot graph of the generation
+        import matplotlib.pyplot as plt
+
+        if self.plot is None:
+            self.plot, self.ax = self._init_live_plot()
+
+        ax = self.ax
+        ax.clear()
+        ax.set_xlabel("Time (beats)")
+        ax.set_ylabel("MIDI Pitch")
+        ax.set_title("RL Musicbot Note Generation")
+        ax.set_ylim(55, 90)
+        ax.set_xlim(0, self.bars * self.beats_per_bar)
+        # ax.grid(True, which="both", ls=":", alpha=0.5) Maybe want to use a grid like bar lines
+        # NOTE might want to add small seperation between notes so two quarters don't look like half
+
+        current_time = 0.0
+
+        for bar_notes in self._musical_score:
+            for pitch, duration, volume in bar_notes:
+                if pitch is not None:
+                    # color = plt.cm.viridis(volume)
+                    ax.hlines(pitch, current_time, current_time + duration, colors="black", linewidth=4)
+                else:
+                    ax.hlines(57, current_time, current_time + duration, colors='lightgray', linewidth=2, alpha=0.6)
+
+                plt.draw()
+
+                current_time += duration
+
+        if self.render_mode == "human":
+            plt.show()
+            plt.pause(self.clock)
+
+        return None
+
+    def close(self):
+        if self.plot is not None:
+            import matplotlib.pyplot as plt
+            plt.close(self.plot)
+
     def save_to_midi(self, filename="generated_music.mid", tempo=120):
+        import pretty_midi
+
         pm = pretty_midi.PrettyMIDI()
         instrument = pretty_midi.Instrument(program=0)  # Acoustic Grand Piano
         seconds_per_beat = 60.0 / tempo
@@ -363,91 +427,4 @@ class RLMusicBotEnv(gym.Env):
         pm.write(filename)
         print(f"Saved generated music to {filename}")
 
-def init_live_plot():
-    plt.ion()
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.set_xlabel("Time (beats)")
-    ax.set_ylabel("MIDI Pitch")
-    ax.set_title("RL Musicbot Note Generation")
-    ax.set_ylim(55, 90)
-    ax.set_xlim(0, 4 * 4)
-    return fig, ax
-
-def update_live_plot(ax, current_time, pitch, duration):
-    if pitch is not None:
-        ax.hlines(pitch, current_time, current_time + duration, colors='black', linewidth=4)
-        plt.draw()
-        plt.pause(duration * 0.4)
-
-# music21 sheet
-def show_final_sheet(musical_score, bpm=120):
-    s = stream.Stream()
-    s.append(tempo.MetronomeMark(number=bpm))
-    s.append(meter.TimeSignature('4/4'))
-
-    # Force the key signature to C major
-    s.append(m21key.Key('C'))
-
-    for bar in musical_score:
-        for (pitch_val, duration, volume) in bar:
-            if pitch_val is None:
-                n = note.Rest(quarterLength=duration)
-            else:
-                n = note.Note(quarterLength=duration)
-                n.pitch = m21pitch.Pitch()
-                n.pitch.midi = int(pitch_val)
-                if n.pitch.accidental is not None:
-                    n.pitch.accidental = None
-            s.append(n)
-
-    def open_musescore():
-        s.show()  # s.show freezes the python demo window, so thread it to avoid
-
-    # program will stay alive while musescore is open
-    t = threading.Thread(target=open_musescore)
-    t.start()
-
-
-env = RLMusicBotEnv()
-obs, _ = env.reset()
-
-fig, ax = init_live_plot()
-current_time = 0.0
-
-
-done = False
-while not done:
-
-    #Calculate how many beats left in bar
-    remaining = 4 - sum([note[1] for note in env._musical_score[env.current_bar]])
-    if env.current_bar >= env.bars:
-        break
-
-    #Pick action
-    action = env.action_space.sample()
-    new_note = env._map_action_to_note(action)
-    duration = new_note[1]
-
-    #Filter out notes that don't fit
-    if duration > remaining:
-        continue
-
-    #Step
-    obs, reward, done, _, _ = env.step(action)
-
-    pitch = new_note[0]
-    update_live_plot(ax, current_time, pitch, duration)
-    current_time += duration
-
-print("musical score: ")
-print(env._musical_score)
-print("reward: ")
-print(reward)
-
-# Save to MIDI
-env.save_to_midi("random_song.mid")
-show_final_sheet(env._musical_score)
-
-# Keep the Matplotlib window alive properly, also needed so the python window doesnt freeze due to s.show()
-plt.ioff()
-plt.show()
+# TODO refact beats left calculation as env observation
