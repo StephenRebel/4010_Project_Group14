@@ -1,6 +1,7 @@
 import numpy as np
 import gymnasium as gym
 from collections import Counter
+import matplotlib.pyplot as plt
 
 class RLMusicBotEnv(gym.Env):
     def __init__(self, bars: int = 4, render_mode: str = None):
@@ -86,8 +87,6 @@ class RLMusicBotEnv(gym.Env):
         self.current_bar_chord = None
         self.prev_bar_chord = None
         obs = self._get_obs()
-
-        self.close()
 
         return obs, {}
     
@@ -345,8 +344,6 @@ class RLMusicBotEnv(gym.Env):
         return final_reward
 
     def _init_live_plot(self):
-            import matplotlib.pyplot as plt
-
             plt.ion()
             fig, ax = plt.subplots(figsize=(12, 6))
             ax.set_xlabel("Time (beats)")
@@ -359,7 +356,6 @@ class RLMusicBotEnv(gym.Env):
 
     def render(self):
         # Display matplot graph of the generation
-        import matplotlib.pyplot as plt
 
         if self.plot is None:
             self.plot, self.ax = self._init_live_plot()
@@ -384,20 +380,20 @@ class RLMusicBotEnv(gym.Env):
                 else:
                     ax.hlines(57, current_time, current_time + duration, colors='lightgray', linewidth=2, alpha=0.6)
 
-                plt.draw()
-
                 current_time += duration
 
         if self.render_mode == "human":
-            plt.show()
+            ax.figure.canvas.draw_idle()
+            ax.figure.canvas.flush_events()
             plt.pause(self.clock)
 
         return None
 
     def close(self):
         if self.plot is not None:
-            import matplotlib.pyplot as plt
             plt.close(self.plot)
+            self.plot = None
+            self.ax = None
 
     def save_to_midi(self, filename="generated_music.mid", tempo=120):
         import pretty_midi

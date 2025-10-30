@@ -6,3 +6,6 @@ random_song.mid
 
 # Ignore code
 code.zip
+
+# Ignore pycache
+__pycache__/
