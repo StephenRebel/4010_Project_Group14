@@ -35,7 +35,7 @@ class RLMusicBotEnv(gym.Env):
         self.progression_weights = {
             ('C', 'C'): 0.3,  # stay on C
             ('C', 'F'): 1.0,  # C to F (strong)
-            ('C', 'G'): 9.0,  # C to G (strong)
+            ('C', 'G'): 1.0,  # C to G (strong) # NOTE is 9.0 right this seems very high?
             ('F', 'C'): 0.8,  # F to C
             ('F', 'G'): 1.0,  # F to G
             ('F', 'F'): 0.3,  # stay on F
@@ -106,39 +106,6 @@ class RLMusicBotEnv(gym.Env):
                 obs[i, j] = [pitch_i, duration_i, volume_i]
         
         return obs
-    
-    # reward function components
-    # essentially we want to reward
-    def _detect_chord(self, bar_notes):
-        # Detecting which chord (C, F, or G) is most prominent in the bar
-        # bar_notes is a list of (pitch, duration, volume) tuples
-        if not bar_notes:
-            return None
-        
-        # get pitches from notes
-        pitches = [note[0] for note in bar_notes if note[0] is not None]   # ignore rests
-
-        # if no pitches, return None
-        if not pitches:
-            return None
-        
-        # counting chord scores and finding best match
-        chord_scores = {}
-
-        # scoring each chord
-        for chord_name, chord_pitches in self.chords.items():
-            score = sum(1 for p in pitches if p in chord_pitches)  # simple count of tones in chord
-            chord_scores[chord_name] = score  # store the score
-        
-        # just in case no chord matches
-        max_score = max(chord_scores.values())
-
-        # if no chord has any score, return None
-        if max_score == 0:
-            return None
-        
-        # return the chord with highest score
-        return max(chord_scores, key=chord_scores.get)
 
     def step(self, action):
 
@@ -175,6 +142,39 @@ class RLMusicBotEnv(gym.Env):
         #View obs
         #print(f"\nStep Observation (bar x note x [pitch,dur,vol]):\n{obs}")
         return obs, reward, done, False, info
+
+    # reward function components
+    # essentially we want to reward
+    def _detect_chord(self, bar_notes):
+        # Detecting which chord (C, F, or G) is most prominent in the bar
+        # bar_notes is a list of (pitch, duration, volume) tuples
+        if not bar_notes:
+            return None
+        
+        # get pitches from notes
+        pitches = [note[0] for note in bar_notes if note[0] is not None]   # ignore rests
+
+        # if no pitches, return None
+        if not pitches:
+            return None
+        
+        # counting chord scores and finding best match
+        chord_scores = {}
+
+        # scoring each chord
+        for chord_name, chord_pitches in self.chords.items():
+            score = sum(1 for p in pitches if p in chord_pitches)  # simple count of tones in chord
+            chord_scores[chord_name] = score  # store the score
+        
+        # just in case no chord matches
+        max_score = max(chord_scores.values())
+
+        # if no chord has any score, return None
+        if max_score == 0:
+            return None
+        
+        # return the chord with highest score
+        return max(chord_scores, key=chord_scores.get)
 
     # Function to compute the reward for the current state of the environment
     # Combination of scale adherence, repetition, and rhythm.    
@@ -246,7 +246,7 @@ class RLMusicBotEnv(gym.Env):
         weights = np.array([1.8, 1.2, 0.9, 0.8, 1.0])
         scores = np.array([quarter_beat_ratio, ioi_stability, entropy_score, note_density_score, syncopation_score])
 
-        rhythm_reward = float(np.dot(scores, weights))
+        rhythm_score = float(np.dot(scores, weights)) / np.sum(weights) # normalized 0 to 1
 
         # Harmony reward
         harmony_score = 0.0
@@ -281,6 +281,9 @@ class RLMusicBotEnv(gym.Env):
         if total_notes > 0:
             harmony_score /= total_notes
 
+        # Normalize to [0, 1] given a perfect harmony score would be 2.5
+        harmony_score = harmony_score / 2.5
+
         # Chord progression reward
         bar_chords = [self._detect_chord(bar) for bar in self._musical_score]
 
@@ -296,6 +299,7 @@ class RLMusicBotEnv(gym.Env):
             weight = self.progression_weights.get((prev_chord, next_chord), 0.1)
             progression_score += weight
 
+        # NOTE Already normalized if the one weight 9.0  was a mistake and it was meant to 1.0, other wise come back
         if valid_transitions > 0:
             progression_score /= valid_transitions
 
@@ -303,6 +307,7 @@ class RLMusicBotEnv(gym.Env):
         sequence = []
         for bar in self._musical_score:
             for (pitch, duration, volume) in bar:
+                # NOTE Do we want to be skipping rests? Some motifs likely include rests as part of the sequence.
                 if pitch is not None:  # skip rests
                     sequence.append((pitch, duration))
 
@@ -334,11 +339,18 @@ class RLMusicBotEnv(gym.Env):
         else:
             repetition_score = 0.0
 
+        # Ensure all scores are are in proper range by clamping, should already be [0.0, 1.0] but failsafe
+        rhythm_norm = float(np.clip(rhythm_score, 0.0, 1.0))
+        harmony_norm = float(np.clip(harmony_score, 0.0, 1.0))
+        progression_norm = float(np.clip(progression_score, 0.0, 1.0))
+        repetition_norm = float(np.clip(repetition_score, 0.0, 1.0))
+
+        # Compute final weight reward score
         final_reward = (
-            0.27 * rhythm_reward +
-            0.35 * harmony_score +
-            0.28 * progression_score +
-            0.1 * repetition_score
+            0.27 * rhythm_norm +
+            0.35 * harmony_norm +
+            0.28 * progression_norm +
+            0.1 * repetition_norm
         )
 
         return final_reward
