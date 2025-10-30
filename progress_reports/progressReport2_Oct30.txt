@@ -1,5 +1,8 @@
 
 Stephen:
+   - Implemented a number of rhythm rewards and combined for total rhythm reward (some may be cut in future)
+   - Refactored display function to fit gymnasium render format
+   - Normalize reward metrics and ensure final score properly normalized
 
 Danial:
    - Implemented the observation space
