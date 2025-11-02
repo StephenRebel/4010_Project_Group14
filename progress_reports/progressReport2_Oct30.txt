@@ -25,3 +25,12 @@ Drax:
    - implementation of harmonic convergence
    - look more into "half-steps" transition notes and exploration values
 
+TA Comments: 
+Well done keep it up.
+
+A couple suggestions: 
+1. Structure your main README.md to give a clean overview of the project (motivation, problem statement, and easy to follow steps) on running the program which starts with: cloning first, followed by setting up env, and including OS specific reqs (if applicable) etc.).
+2. As we go along, consider doing work on practical evaluation benchmarks, for example, how good the agent generates "twinkle twinkle little star" rhythm. Some understanding of piano notes can significantly enhance the project progress. 
+
+Resources:
+You may find Duolingo’s free Music course helpful for quickly learning the fundamentals of musical notes.
