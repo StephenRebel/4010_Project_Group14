@@ -28,6 +28,8 @@ for _ in range(2):
 
     print("musical score: ")
     print(env._musical_score)
+    print("chord progression: ")
+    print(", ".join(env.chord_progression))
     print("reward: ")
     print(reward)
 

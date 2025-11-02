@@ -13,7 +13,7 @@ class RLMusicBotEnv(gym.Env):
         self.scale = "C"
 
         # Note options
-        self.pitches = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83]  # 2 octave c major scale
+        self.pitches = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84]  # 2 octave c major scale
         self.rest_action = len(self.pitches)
         self.n_pitches = len(self.pitches) + 1  # +1 for rest
 
@@ -23,25 +23,81 @@ class RLMusicBotEnv(gym.Env):
         self.volumes = [0.4, 0.6, 0.8, 1.0]
         self.n_volumes = len(self.volumes)
         
-        # Chord definitions
+        # C maj Chord definitions
         self.chords = {
-            'C': [60, 64, 67, 72, 76, 79],  # C, E, G
-            'F': [65, 69, 60, 77, 81, 72],  # F, A, C 
-            'G': [67, 71, 62, 79, 83, 74]   # G, B, D
+            'C':    [60, 64, 67, 72, 76, 79, 84],   # C E G (C4-C6)
+            'Dm':   [62, 65, 69, 74, 77, 81],       # D F A
+            'Em':   [64, 67, 71, 76, 79, 83],       # E G B
+            'F':    [65, 69, 72, 77, 81, 84],       # F A C
+            'G':    [67, 71, 74, 79, 83],           # G B D
+            'Am':   [69, 72, 76, 81, 84],           # A C E
+            'Bdim': [71, 74, 77, 83],               # B D F
         }
 
         # Chord progressions weights
-        # MOST Common progression - C F G C
         self.progression_weights = {
-            ('C', 'C'): 0.3,  # stay on C
-            ('C', 'F'): 1.0,  # C to F (strong)
-            ('C', 'G'): 1.0,  # C to G (strong) # NOTE is 9.0 right this seems very high?
-            ('F', 'C'): 0.8,  # F to C
-            ('F', 'G'): 1.0,  # F to G
-            ('F', 'F'): 0.3,  # stay on F
-            ('G', 'C'): 1.0,  # G to C (resolution)
-            ('G', 'F'): 0.7,  # G to F
-            ('G', 'G'): 0.3,  # stay on G
+            # --- C progressions ---
+            ('C', 'C'): 0.3,        # repetition (neutral)
+            ('C', 'Am'): 1.0,       # I → vi (good)
+            ('C', 'Dm'): 1.0,       # I → ii (good)
+            ('C', 'Em'): 0.3,       # I → iii (okay)
+            ('C', 'F'): 1.0,        # I → IV (good)
+            ('C', 'G'): 1.0,        # I → V (good)
+            ('C', 'Bdim'): -1.0,    # I → vii° (bad)
+
+            # --- Dm progressions ---
+            ('Dm', 'C'): 0.3,       # ii → I (okay)
+            ('Dm', 'Dm'): 0.3,      # repetition (neutral)
+            ('Dm', 'Em'): -0.5,     # ii → iii (bad)
+            ('Dm', 'F'): 0.3,       # ii → IV (okay)
+            ('Dm', 'G'): 1.0,       # ii → V (good)
+            ('Dm', 'Am'): 1.0,      # ii → vi (good)
+            ('Dm', 'Bdim'): -0.5,   # ii → vii° (bad)
+
+            # --- Em progressions ---
+            ('Em', 'C'): 0.3,       # iii → I (okay)
+            ('Em', 'Dm'): -0.5,     # iii → ii (bad)
+            ('Em', 'Em'): 0.3,      # repetition (neutral)
+            ('Em', 'F'): 0.3,       # iii → IV (okay)
+            ('Em', 'G'): 0.3,       # iii → V (okay)
+            ('Em', 'Am'): 0.3,      # iii → vi (okay)
+            ('Em', 'Bdim'): -0.5,   # iii → vii° (bad)
+
+            # --- F progressions ---
+            ('F', 'C'): 1.0,        # IV → I (good / resolution)
+            ('F', 'Dm'): 1.0,       # IV → ii (good)
+            ('F', 'Em'): 0.3,       # IV → iii (okay)
+            ('F', 'F'): 0.3,        # repetition (neutral)
+            ('F', 'G'): 1.0,        # IV → V (good)
+            ('F', 'Am'): 0.3,       # IV → vi (okay)
+            ('F', 'Bdim'): -1.0,    # IV → vii° (bad)
+
+            # --- G progressions ---
+            ('G', 'C'): 1.0,        # V → I (good / strong resolution)
+            ('G', 'Dm'): -0.5,      # V → ii (bad)
+            ('G', 'Em'): 0.3,       # V → iii (okay)
+            ('G', 'F'): 0.3,        # V → IV (okay)
+            ('G', 'G'): 0.3,        # repetition (neutral)
+            ('G', 'Am'): 0.3,       # V → vi (okay / deceptive cadence)
+            ('G', 'Bdim'): -1.0,    # V → vii° (bad)
+
+            # --- Am progressions ---
+            ('Am', 'C'): 1.0,       # vi → I (good)
+            ('Am', 'Dm'): 1.0,      # vi → ii (good)
+            ('Am', 'Em'): -0.5,     # vi → iii (bad)
+            ('Am', 'F'): 1.0,       # vi → IV (good)
+            ('Am', 'G'): 0.3,       # vi → V (okay)
+            ('Am', 'Am'): 0.3,      # repetition (neutral)
+            ('Am', 'Bdim'): -0.5,   # vi → vii° (bad)
+
+            # --- Bdim progressions ---
+            ('Bdim', 'C'): 1.0,     # vii° → I (good / resolution)
+            ('Bdim', 'G'): 1.0,     # vii° → V (good)
+            ('Bdim', 'Am'): -1.0,   # vii° → vi (bad)
+            ('Bdim', 'Dm'): -1.0,   # vii° → ii (bad)
+            ('Bdim', 'Em'): -1.0,   # vii° → iii (bad)
+            ('Bdim', 'F'): -1.0,    # vii° → IV (bad)
+            ('Bdim', 'Bdim'): 0.3,  # repetition (neutral)
         }
 
         # Spaces
@@ -63,6 +119,7 @@ class RLMusicBotEnv(gym.Env):
         self.last_duration = 0.0
         self.current_bar_chord = None
         self.prev_bar_chord = None
+        self.chord_progression = []  # Store the sequence of chords
 
         # Rednering
         self.render_mode = render_mode
@@ -86,6 +143,7 @@ class RLMusicBotEnv(gym.Env):
         self.last_duration = 0.0
         self.current_bar_chord = None
         self.prev_bar_chord = None
+        self.chord_progression = []  # Reset chord progression
         obs = self._get_obs()
 
         return obs, {}
@@ -121,7 +179,13 @@ class RLMusicBotEnv(gym.Env):
         # If total duration in current bar exceeds beats_per_bar, move to next bar
         total_duration = sum(n[1] for n in self._musical_score[self.current_bar])
         if total_duration >= self.beats_per_bar:
+            # Detect the chord for the finished bar
+            detected_chord = self._detect_chord(self._musical_score[self.current_bar])
+            if detected_chord is not None:
+                self.chord_progression.append(detected_chord)
+            
             self.prev_bar_chord = self.current_bar_chord
+            self.current_bar_chord = detected_chord  # Set the current bar chord
             self.current_bar += 1
             if self.current_bar < self.bars:
                 self.current_bar_chord = None
@@ -146,7 +210,7 @@ class RLMusicBotEnv(gym.Env):
     # reward function components
     # essentially we want to reward
     def _detect_chord(self, bar_notes):
-        # Detecting which chord (C, F, or G) is most prominent in the bar
+        # Detecting which chord is most prominent in the bar
         # bar_notes is a list of (pitch, duration, volume) tuples
         if not bar_notes:
             return None
