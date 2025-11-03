@@ -1,11 +1,15 @@
 # Ignore virtual environments
 .venv/
+venv_sb3/
 
 # Ignore song output files
-random_song.mid
+*.mid
 
 # Ignore code
-code.zip
+*.zip
 
 # Ignore pycache
 __pycache__/
+
+#For mac
+.DS_Store

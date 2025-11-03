@@ -3,6 +3,7 @@ import gymnasium as gym
 from collections import Counter
 import matplotlib.pyplot as plt
 
+
 class RLMusicBotEnv(gym.Env):
     def __init__(self, bars: int = 4, render_mode: str = None):
         super(RLMusicBotEnv, self).__init__()
@@ -101,16 +102,13 @@ class RLMusicBotEnv(gym.Env):
         }
 
         # Spaces
-        self.action_space = gym.spaces.MultiDiscrete([
-            self.n_pitches,
-            self.n_durations,
-            self.n_volumes
-        ])
+        self.action_space = gym.spaces.Discrete(self.n_pitches * self.n_durations * self.n_volumes)
 
-        #Define the observation space: An np array of bars (array) of notes (array), contains indices NOT values
+        #Define the observation space
         self.MAX_NOTES_PER_BAR = 16
-        highs = [self.n_pitches-1, self.n_durations-1, self.n_volumes-1]
-        self.observation_space = gym.spaces.MultiDiscrete([highs] * self.MAX_NOTES_PER_BAR * bars)
+        obs_shape = (self.bars * self.MAX_NOTES_PER_BAR * 3 + 1,)
+        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=obs_shape, dtype=np.float32)
+
 
         # Internal state
         self._musical_score = []
@@ -128,10 +126,14 @@ class RLMusicBotEnv(gym.Env):
         self.clock = 0.5
 
     def _map_action_to_note(self, action):
-        pitch_idx, duration_idx, volume_idx = action
+        pitch_idx = action // (self.n_durations * self.n_volumes)
+        duration_idx = (action % (self.n_durations * self.n_volumes)) // self.n_volumes
+        volume_idx = action % self.n_volumes
+
         pitch = None if pitch_idx == self.rest_action else self.pitches[pitch_idx]
         duration = self.durations[duration_idx]
         volume = self.volumes[volume_idx]
+
         return (pitch, duration, volume)
 
     def reset(self, seed=None):
@@ -145,31 +147,56 @@ class RLMusicBotEnv(gym.Env):
         self.prev_bar_chord = None
         self.chord_progression = []  # Reset chord progression
         obs = self._get_obs()
-
-        return obs, {}
+        return obs.astype(np.float32), {}
     
     #Get current observation space
     def _get_obs(self):
-        # Prepare an empty array of indices
-        obs = np.zeros((self.bars, self.MAX_NOTES_PER_BAR, 3), dtype=np.int32)
-        
-        # Iterate over bars
+        # Prepare an empty array for indices
+        obs = np.zeros((self.bars, self.MAX_NOTES_PER_BAR, 3), dtype=np.float32)
+
+        # Fill in the notes
         for i, bar in enumerate(self._musical_score[:self.bars]):
             for j, (pitch, duration, volume) in enumerate(bar[:self.MAX_NOTES_PER_BAR]):
                 # Convert pitch, duration, volume to indices
                 pitch_i = self.pitches.index(pitch) if pitch in self.pitches else self.rest_action
                 duration_i = self.durations.index(duration)
                 volume_i = self.volumes.index(volume)
-                
-                obs[i, j] = [pitch_i, duration_i, volume_i]
-        
-        return obs
+
+                # Normalize to [0,1]
+                pitch_norm = pitch_i / (self.n_pitches - 1)
+                duration_norm = duration_i / (self.n_durations - 1)
+                volume_norm = volume_i / (self.n_volumes - 1)
+
+                obs[i, j] = [pitch_norm, duration_norm, volume_norm]
+
+        obs = obs.flatten()
+
+        #Compute beats left in current bar
+        if self.current_bar < self.bars:
+            current_bar_notes = self._musical_score[self.current_bar]
+            beats_left = max(self.beats_per_bar - sum(n[1] for n in current_bar_notes), 0)
+        else:
+            beats_left = 0.0
+
+        beats_left_norm = beats_left / self.beats_per_bar
+        obs = np.append(obs, [beats_left_norm])
+
+        return obs.flatten()
 
     def step(self, action):
 
         #Get note from action space
         note = self._map_action_to_note(action)
         pitch, duration, volume = note
+
+        remaining = self.beats_per_bar - sum([n[1] for n in self._musical_score[self.current_bar]])
+
+        #Punish durations longer than allowed
+        if duration > remaining:
+            reward = 0
+            obs = self._get_obs()
+            done = False
+            return obs.astype(np.float32), reward, done, False, {}
         
         self._musical_score[self.current_bar].append(note)
         self.last_pitch = pitch
@@ -198,14 +225,11 @@ class RLMusicBotEnv(gym.Env):
         else:
             reward = 0.0
 
-        if self.render_mode == "human":
-            self.render()
-
         obs = self._get_obs()
         info = {'current_chord': self.current_bar_chord}
         #View obs
         #print(f"\nStep Observation (bar x note x [pitch,dur,vol]):\n{obs}")
-        return obs, reward, done, False, info
+        return obs.astype(np.float32), reward, done, False, {}
 
     # reward function components
     # essentially we want to reward
@@ -295,7 +319,8 @@ class RLMusicBotEnv(gym.Env):
             ioi = np.diff(played_arr)
             ioi_mean = float(np.mean(ioi))
             ioi_var = float(np.var(ioi))
-            ioi_stability = 1.0 - (ioi_var / (ioi_mean ** 2 * ioi_var)) # should be 0 to 1
+            epsilon = 1e-8
+            ioi_stability = 1.0 - (ioi_var / ((ioi_mean ** 2) * (ioi_var + epsilon))) # should be 0 to 1
         else:
             ioi_stability = 0.5
 
