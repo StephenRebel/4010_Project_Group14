@@ -221,7 +221,7 @@ class RLMusicBotEnv(gym.Env):
         
         # For now reward structure 0 unless at terminal state, i.e. only reward
         if done:
-            reward = self._compute_reward()
+            reward = self._compute_reward(self._musical_score)
         else:
             reward = 0.0
 
@@ -266,7 +266,7 @@ class RLMusicBotEnv(gym.Env):
 
     # Function to compute the reward for the current state of the environment
     # Combination of scale adherence, repetition, and rhythm.    
-    def _compute_reward(self):
+    def _compute_reward(self, musical_score):
         # Rhythm reward section, may have to look at datasets of MIDI for some of these parameters
         subdivisions = 4 # allowing 16th notes above
         min_note_duration = 0.25
@@ -283,7 +283,7 @@ class RLMusicBotEnv(gym.Env):
         notes_per_bar = []
 
         current_sub = 0
-        for bar in self._musical_score:
+        for bar in musical_score:
             count_in_bar = 0
             for (pitch, duration, volume) in bar:
                 sub_divs_note = int(duration * subdivisions)
@@ -341,15 +341,15 @@ class RLMusicBotEnv(gym.Env):
         harmony_score = 0.0
         total_notes = 0
 
-        for bar_idx, bar in enumerate(self._musical_score):
+        for bar_idx, bar in enumerate(musical_score):
             chord_name = self._detect_chord(bar)
             if chord_name is None:
                 continue
 
             chord_pitches = self.chords[chord_name]
             next_chord_pitches = []
-            if bar_idx + 1 < len(self._musical_score):
-                next_chord = self._detect_chord(self._musical_score[bar_idx + 1])
+            if bar_idx + 1 < len(musical_score):
+                next_chord = self._detect_chord(musical_score[bar_idx + 1])
                 if next_chord:
                     next_chord_pitches = self.chords[next_chord]
 
@@ -374,7 +374,7 @@ class RLMusicBotEnv(gym.Env):
         harmony_score = harmony_score / 2.5
 
         # Chord progression reward
-        bar_chords = [self._detect_chord(bar) for bar in self._musical_score]
+        bar_chords = [self._detect_chord(bar) for bar in musical_score]
 
         progression_score = 0.0
         valid_transitions = 0
@@ -394,7 +394,7 @@ class RLMusicBotEnv(gym.Env):
 
         # Repetition reward
         sequence = []
-        for bar in self._musical_score:
+        for bar in musical_score:
             for (pitch, duration, volume) in bar:
                 # NOTE Do we want to be skipping rests? Some motifs likely include rests as part of the sequence.
                 if pitch is not None:  # skip rests
