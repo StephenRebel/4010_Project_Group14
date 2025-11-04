@@ -442,6 +442,8 @@ class RLMusicBotEnv(gym.Env):
             0.1 * repetition_norm
         )
 
+        print(f"Reward Breakdown -- Rhythm: {rhythm_norm:.3f}, Harmony: {harmony_norm:.3f}, Progression: {progression_norm:.3f}, Repetition: {repetition_norm:.3f} => Final: {final_reward:.3f}")
+
         return final_reward
 
     def _init_live_plot(self):
