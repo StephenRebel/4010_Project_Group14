@@ -1,0 +1,4 @@
+Stephen:
+    - Addressed README changes
+    - Set up generation of some random/basic heuristic dataset for baseline modelling
+    - Worked on some simple ngram and LSTM models for comparing against RL method
