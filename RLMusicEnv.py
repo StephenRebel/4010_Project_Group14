@@ -340,18 +340,28 @@ class RLMusicBotEnv(gym.Env):
         rhythm_score = float(np.dot(scores, weights)) / np.sum(weights) # normalized 0 to 1
 
         # Harmony reward
+        # Compute per-note harmony contributions and detect Diatonic Non-Chord Tones
         harmony_score = 0.0
         total_notes = 0
 
+        # Precompute chord for each bar and build melodic sequence for context
+        bar_chords = [self._detect_chord(bar) for bar in musical_score]
+        melodic_notes = []  # list of (pitch, bar_idx) in melodic order
+
         for bar_idx, bar in enumerate(musical_score):
-            chord_name = self._detect_chord(bar)
+            chord_name = bar_chords[bar_idx]
+            # collect melodic notes regardless of chord detection so sequence is continuous
+            for (pitch, duration, volume) in bar:
+                if pitch is not None:
+                    melodic_notes.append((pitch, bar_idx))
+
             if chord_name is None:
                 continue
 
             chord_pitches = self.chords[chord_name]
             next_chord_pitches = []
             if bar_idx + 1 < len(musical_score):
-                next_chord = self._detect_chord(musical_score[bar_idx + 1])
+                next_chord = bar_chords[bar_idx + 1]
                 if next_chord:
                     next_chord_pitches = self.chords[next_chord]
 
@@ -359,18 +369,55 @@ class RLMusicBotEnv(gym.Env):
                 if pitch is None:
                     continue
                 total_notes += 1
-                # Scale fit - should always fit since gen is in C Maj
-                # if (pitch % 12) in [0, 2, 4, 5, 7, 9, 11]:  # C major pitch classes
-                #     harmony_score += 1.0
-                # Chord fit - if its in the current bar chord
+                # Chord tone: strong boost
                 if pitch in chord_pitches:
                     harmony_score += 2.0
-                # Smooth transition - if it happens to be a transition note that works for both bars
+                # Smooth transition: if pitch also fits next chord
                 if next_chord_pitches and pitch in next_chord_pitches:
                     harmony_score += 0.5
 
+        # Diatonic Non-Chord Tone (NCT) detection and reward 
+        # Rules:
+        # - Note is NOT a chord tone for its bar
+        # - Passing: prev < curr < next or prev > curr > next
+        # - Neighbor: prev == next and |curr - prev| == 1 step in self.pitches
+        nct_bonus = 0.0
+        for i, (pitch, bar_idx) in enumerate(melodic_notes):
+            chord_name = bar_chords[bar_idx]
+            if chord_name is None:
+                continue
+            chord_pitches = self.chords[chord_name]
+            # skip chord tones and out-of-scale pitches
+            if pitch in chord_pitches:
+                continue
+            if pitch not in self.pitches:
+                continue
+
+            prev_pitch = melodic_notes[i - 1][0] if i - 1 >= 0 else None
+            next_pitch = melodic_notes[i + 1][0] if i + 1 < len(melodic_notes) else None
+
+            # Passing tone check
+            if prev_pitch is not None and next_pitch is not None:
+                if (prev_pitch < pitch < next_pitch) or (prev_pitch > pitch > next_pitch):
+                    nct_bonus += 0.5
+                    continue
+
+            # Neighbor tone check (prev == next and current is one diatonic step away)
+            if prev_pitch is not None and next_pitch is not None and prev_pitch == next_pitch:
+                try:
+                    idx_curr = self.pitches.index(pitch)
+                    idx_prev = self.pitches.index(prev_pitch)
+                except ValueError:
+                    continue
+                if abs(idx_curr - idx_prev) == 1:
+                    nct_bonus += 0.5
+                    continue
+
+        # incorporate NCT bonuses into harmony numerator then normalize
         if total_notes > 0:
-            harmony_score /= total_notes
+            harmony_score = (harmony_score + nct_bonus) / total_notes
+        else:
+            harmony_score = 0.0
 
         # Normalize to [0, 1] given a perfect harmony score would be 2.5
         harmony_score = harmony_score / 2.5
@@ -447,7 +494,13 @@ class RLMusicBotEnv(gym.Env):
         if self.debug:
             print(f"Reward Breakdown -- Rhythm: {rhythm_norm:.3f}, Harmony: {harmony_norm:.3f}, Progression: {progression_norm:.3f}, Repetition: {repetition_norm:.3f} => Final: {final_reward:.3f}")
 
-        return final_reward
+        # Return both final reward and breakdown dictionary
+        return final_reward, {
+            'rhythm': rhythm_norm,
+            'harmony': harmony_norm,
+            'progression': progression_norm,
+            'repetition': repetition_norm
+        }
 
     def _init_live_plot(self):
             plt.ion()
