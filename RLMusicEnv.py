@@ -341,8 +341,13 @@ class RLMusicBotEnv(gym.Env):
 
         # Harmony reward
         # Compute per-note harmony contributions and detect Diatonic Non-Chord Tones
-        harmony_score = 0.0
-        total_notes = 0
+        # We'll track granular components for debug breakdown.
+        harmony_score = 0.0  # final normalized score (computed later)
+        total_notes = 0      # melodic notes counted that are not rests
+        chord_tone_hits = 0  # number of notes that are chord tones in their bar
+        transition_hits = 0  # number of notes that also belong to the next bar's chord (smooth voice-leading)
+        passing_ncts = 0     # number of passing non-chord tones
+        neighbor_ncts = 0    # number of neighbor non-chord tones
 
         # Precompute chord for each bar and build melodic sequence for context
         bar_chords = [self._detect_chord(bar) for bar in musical_score]
@@ -371,17 +376,17 @@ class RLMusicBotEnv(gym.Env):
                 total_notes += 1
                 # Chord tone: strong boost
                 if pitch in chord_pitches:
-                    harmony_score += 2.0
+                    chord_tone_hits += 1
                 # Smooth transition: if pitch also fits next chord
                 if next_chord_pitches and pitch in next_chord_pitches:
-                    harmony_score += 0.5
+                    transition_hits += 1
 
         # Diatonic Non-Chord Tone (NCT) detection and reward 
         # Rules:
         # - Note is NOT a chord tone for its bar
         # - Passing: prev < curr < next or prev > curr > next
         # - Neighbor: prev == next and |curr - prev| == 1 step in self.pitches
-        nct_bonus = 0.0
+        nct_bonus = 0.0  # accumulated bonus value (0.5 per passing/neighbor tone)
         for i, (pitch, bar_idx) in enumerate(melodic_notes):
             chord_name = bar_chords[bar_idx]
             if chord_name is None:
@@ -400,6 +405,7 @@ class RLMusicBotEnv(gym.Env):
             if prev_pitch is not None and next_pitch is not None:
                 if (prev_pitch < pitch < next_pitch) or (prev_pitch > pitch > next_pitch):
                     nct_bonus += 0.5
+                    passing_ncts += 1
                     continue
 
             # Neighbor tone check (prev == next and current is one diatonic step away)
@@ -411,16 +417,19 @@ class RLMusicBotEnv(gym.Env):
                     continue
                 if abs(idx_curr - idx_prev) == 1:
                     nct_bonus += 0.5
+                    neighbor_ncts += 1
                     continue
 
-        # incorporate NCT bonuses into harmony numerator then normalize
-        if total_notes > 0:
-            harmony_score = (harmony_score + nct_bonus) / total_notes
-        else:
-            harmony_score = 0.0
-
-        # Normalize to [0, 1] given a perfect harmony score would be 2.5
-        harmony_score = harmony_score / 2.5
+        # Compute raw harmony points from counters (mirror previous additive logic)
+        raw_harmony_points = (
+            chord_tone_hits * 2.0 +
+            transition_hits * 0.5 +
+            passing_ncts * 0.5 +
+            neighbor_ncts * 0.5
+        )
+        per_note_average = (raw_harmony_points / total_notes) if total_notes > 0 else 0.0
+        # Normalize to [0, 1] given a perfect per-note value would be 2.5
+        harmony_score = per_note_average / 2.5
 
         # Chord progression reward
         bar_chords = [self._detect_chord(bar) for bar in musical_score]
@@ -506,29 +515,53 @@ class RLMusicBotEnv(gym.Env):
             # Get detected chords for display
             detected_chords = [self._detect_chord(bar) for bar in musical_score]
             chords_str = ", ".join([str(c) if c else "None" for c in detected_chords])
-            
+
             print("\n" + "="*60)
-            print(f"REWARD")
+            print("REWARD")
             print("="*60)
             print(f"Overall: {final_reward:.4f}")
+            # Rhythm detailed breakdown
             print(f"  Rhythm:      {rhythm_norm:.4f}")
+            print(f"    - Quarter beat ratio:    {quarter_beat_ratio:.4f} (weight: 1.8)")
+            print(f"    - IOI stability:         {ioi_stability:.4f} (weight: 1.2)")
+            print(f"    - Entropy score:         {entropy_score:.4f} (weight: 0.9)")
+            print(f"    - Note density:          {note_density_score:.4f} (weight: 0.8)")
+            print(f"    - Syncopation:           {syncopation_score:.4f} (weight: 1.0)")
+            print(f"    - Total notes played:    {total_notes_played}")
+            print(f"    - Avg notes per bar:     {avg_notes_per_bar:.2f} (target: {expect_avg_npb:.1f})")
+            # Harmony detailed breakdown
             print(f"  Harmony:     {harmony_norm:.4f}")
+            print(f"    - Total melodic notes:   {total_notes}")
+            print(f"    - Chord tones:           {chord_tone_hits} (x2.0 = {chord_tone_hits * 2.0:.1f})")
+            print(f"    - Smooth transitions:    {transition_hits} (x0.5 = {transition_hits * 0.5:.1f})")
+            print(f"    - Passing NCTs:          {passing_ncts} (x0.5 = {passing_ncts * 0.5:.1f})")
+            print(f"    - Neighbor NCTs:         {neighbor_ncts} (x0.5 = {neighbor_ncts * 0.5:.1f})")
+            print(f"    - Raw harmony points:    {raw_harmony_points:.2f}")
+            print(f"    - Per-note average:      {per_note_average:.4f}")
+            print(f"    - Normalized (/2.5):     {harmony_norm:.4f}")
+            # Progression section
             print(f"  Progression: {progression_norm:.4f}")
             print(f"    - Chords: [{chords_str}]")
+            # Chord progression transitions
+            for i in range(len(detected_chords) - 1):
+                c1 = detected_chords[i]
+                c2 = detected_chords[i + 1]
+                if c1 is not None and c2 is not None:
+                    weight = self.progression_weights.get((c1, c2), 0.1)
+                    print(f"    - Chord {i+1}->{i+2}: {c1}->{c2} ({weight:.1f})")
+            # Repetition breakdown
             print(f"  Repetition:  {repetition_norm:.4f}")
             print(f"    - Motif:   {repetition_motif_score:.4f}")
             print(f"    - Bar:     {repetition_bar_score:.4f}")
             print(f"    - Rhythm:  {repetition_rhythm_score:.4f}")
             print("="*60 + "\n")
+
         # Return both final reward and breakdown dictionary
         return final_reward, {
             'rhythm': rhythm_norm,
             'harmony': harmony_norm,
             'progression': progression_norm,
             'repetition': repetition_norm,
-            'repetition_motif_score': repetition_motif_score,
-            'repetition_bar_score': repetition_bar_score,
-            'repetition_rhythm_score': repetition_rhythm_score
         }
 
     def _init_live_plot(self):
