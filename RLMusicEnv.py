@@ -442,46 +442,51 @@ class RLMusicBotEnv(gym.Env):
             progression_score /= valid_transitions
 
         # Repetition reward
-        # Build sequence of pitches (ignoring duration/volume)
-        # to detect melodic motif repetition
+        # 1. Motif repetition (melodic n-grams)
         sequence = []
         for bar in musical_score:
             for (pitch, duration, volume) in bar:
-                # Only track pitch for repetition detection (melody/motif)
-                if pitch is not None:  # skip rests
+                if pitch is not None:
                     sequence.append(pitch)
 
-        repetition_score = 0.0
+        repetition_motif_score = 0.0
         if len(sequence) >= 2:
             total_weight = 0.0
-
-            # Check for multiple n-gram sizes (1, 2, 3)
-            # weights: individual pitch repetition, then 2-note and 3-note motifs
             for n, weight in [(1, 0.3), (2, 0.4), (3, 0.3)]:
                 if len(sequence) < n:
                     continue
-
-                # Extract all n-gram subsequences and count occurrences
                 ngrams = [tuple(sequence[i:i+n]) for i in range(len(sequence) - n + 1)]
                 if len(ngrams) == 0:
                     continue
-                    
                 counts = Counter(ngrams)
-                # Count how many unique n-grams appear more than once
                 repeated = sum(1 for c in counts.values() if c > 1)
-                # repetition_ratio = (# of repeated n-grams) / (# of total unique n-grams)
                 repetition_ratio = repeated / len(counts) if len(counts) > 0 else 0
-
-                # Scaling should be nonlinear to reward smaller repetitions
                 score_n = repetition_ratio ** 0.5
-                # Weighted sum of the repetition scores across n
-                repetition_score += weight * score_n
+                repetition_motif_score += weight * score_n
                 total_weight += weight
-
             if total_weight > 0:
-                repetition_score /= total_weight
+                repetition_motif_score /= total_weight
         else:
-            repetition_score = 0.0
+            repetition_motif_score = 0.0
+
+        # 2. Bar repetition (identical bars)
+        bar_tuples = [tuple(bar) for bar in musical_score]
+        bar_counts = Counter(bar_tuples)
+        repeated_bars = sum(1 for c in bar_counts.values() if c > 1)
+        bar_repetition_ratio = repeated_bars / len(bar_counts) if len(bar_counts) > 0 else 0
+        repetition_bar_score = bar_repetition_ratio ** 0.5
+
+        # 3. Rhythm repetition: proportion of bars matching the most common rhythm pattern
+        rhythm_tuples = [tuple([note[1] for note in bar]) for bar in musical_score]
+        rhythm_counts = Counter(rhythm_tuples)
+        if len(rhythm_counts) > 0:
+            most_common_rhythm_count = max(rhythm_counts.values())
+            repetition_rhythm_score = most_common_rhythm_count / len(rhythm_tuples)
+        else:
+            repetition_rhythm_score = 0.0
+
+        # Combine all repetition components (equal weights)
+        repetition_score = (repetition_motif_score + repetition_bar_score + repetition_rhythm_score) / 3.0
 
         # Ensure all scores are are in proper range by clamping, should already be [0.0, 1.0] but failsafe
         rhythm_norm = float(np.clip(rhythm_score, 0.0, 1.0))
@@ -499,13 +504,16 @@ class RLMusicBotEnv(gym.Env):
 
         if self.debug:
             print(f"Reward Breakdown -- Rhythm: {rhythm_norm:.3f}, Harmony: {harmony_norm:.3f}, Progression: {progression_norm:.3f}, Repetition: {repetition_norm:.3f} => Final: {final_reward:.3f}")
-
+           
         # Return both final reward and breakdown dictionary
         return final_reward, {
             'rhythm': rhythm_norm,
             'harmony': harmony_norm,
             'progression': progression_norm,
-            'repetition': repetition_norm
+            'repetition': repetition_norm,
+            'repetition_motif_score': repetition_motif_score,
+            'repetition_bar_score': repetition_bar_score,
+            'repetition_rhythm_score': repetition_rhythm_score
         }
 
     def _init_live_plot(self):
