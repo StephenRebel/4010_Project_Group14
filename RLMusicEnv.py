@@ -5,13 +5,14 @@ import matplotlib.pyplot as plt
 
 
 class RLMusicBotEnv(gym.Env):
-    def __init__(self, bars: int = 4, render_mode: str = None):
+    def __init__(self, bars: int = 4, render_mode: str = None, debug: bool = False):
         super(RLMusicBotEnv, self).__init__()
 
         # Config
         self.bars = bars
         self.beats_per_bar = 4
         self.scale = "C"
+        self.debug = debug
 
         # Note options
         self.pitches = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84]  # 2 octave c major scale
@@ -228,7 +229,8 @@ class RLMusicBotEnv(gym.Env):
         obs = self._get_obs()
         info = {'current_chord': self.current_bar_chord}
         #View obs
-        #print(f"\nStep Observation (bar x note x [pitch,dur,vol]):\n{obs}")
+        if self.debug:
+            print(f"\nStep Observation (bar x note x [pitch,dur,vol]):\n{obs}")
         return obs.astype(np.float32), reward, done, False, {}
 
     # reward function components
@@ -442,7 +444,8 @@ class RLMusicBotEnv(gym.Env):
             0.1 * repetition_norm
         )
 
-        print(f"Reward Breakdown -- Rhythm: {rhythm_norm:.3f}, Harmony: {harmony_norm:.3f}, Progression: {progression_norm:.3f}, Repetition: {repetition_norm:.3f} => Final: {final_reward:.3f}")
+        if self.debug:
+            print(f"Reward Breakdown -- Rhythm: {rhythm_norm:.3f}, Harmony: {harmony_norm:.3f}, Progression: {progression_norm:.3f}, Repetition: {repetition_norm:.3f} => Final: {final_reward:.3f}")
 
         return final_reward
 
