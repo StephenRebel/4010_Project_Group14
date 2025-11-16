@@ -442,31 +442,37 @@ class RLMusicBotEnv(gym.Env):
             progression_score /= valid_transitions
 
         # Repetition reward
+        # Build sequence of pitches (ignoring duration/volume)
+        # to detect melodic motif repetition
         sequence = []
         for bar in musical_score:
             for (pitch, duration, volume) in bar:
-                # NOTE Do we want to be skipping rests? Some motifs likely include rests as part of the sequence.
+                # Only track pitch for repetition detection (melody/motif)
                 if pitch is not None:  # skip rests
-                    sequence.append((pitch, duration))
+                    sequence.append(pitch)
 
         repetition_score = 0.0
-        if len(sequence) >= 4:
+        if len(sequence) >= 2:
             total_weight = 0.0
 
-            # Check for multiple n-gram sizes (2, 3 ,4)
-            # weights slightly favor shorter motifs of 2 or 3 notes
-            for n, weight in [(2, 0.4), (3, 0.4), (4, 0.2)]:
-                if len(sequence) < n * 2: # sequence has to be long enough for us to check repeats
+            # Check for multiple n-gram sizes (1, 2, 3)
+            # weights: individual pitch repetition, then 2-note and 3-note motifs
+            for n, weight in [(1, 0.3), (2, 0.4), (3, 0.3)]:
+                if len(sequence) < n:
                     continue
 
-                # Extract all of the length n  subsequences and count the occurences of each n-gram
+                # Extract all n-gram subsequences and count occurrences
                 ngrams = [tuple(sequence[i:i+n]) for i in range(len(sequence) - n + 1)]
+                if len(ngrams) == 0:
+                    continue
+                    
                 counts = Counter(ngrams)
-                # Count how many motifs repeat more than once
+                # Count how many unique n-grams appear more than once
                 repeated = sum(1 for c in counts.values() if c > 1)
-                repetition_ratio = repeated / len(counts)
+                # repetition_ratio = (# of repeated n-grams) / (# of total unique n-grams)
+                repetition_ratio = repeated / len(counts) if len(counts) > 0 else 0
 
-                # Scaling should be nonlinear as we still should reward smaller repetitions
+                # Scaling should be nonlinear to reward smaller repetitions
                 score_n = repetition_ratio ** 0.5
                 # Weighted sum of the repetition scores across n
                 repetition_score += weight * score_n
