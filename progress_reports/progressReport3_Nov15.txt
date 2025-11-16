@@ -6,3 +6,8 @@ Stephen:
 Danial:
     - Implemented pre-built models for PPO and DQN
     - Investigated results and potential issues with our reward functions
+
+Drax:
+    - NCT non-chord tones introduction for harmony reward
+    - Reptition reward fixes - accounts for more instances of repetition
+    - Todo: more harmony rewards for complex NCTS, add more sample songs to benchmarks
