@@ -2,3 +2,7 @@ Stephen:
     - Addressed README changes
     - Set up generation of some random/basic heuristic dataset for baseline modelling
     - Worked on some simple ngram and LSTM models for comparing against RL method
+
+Danial:
+    - Implemented pre-built models for PPO and DQN
+    - Investigated results and potential issues with our reward functions
