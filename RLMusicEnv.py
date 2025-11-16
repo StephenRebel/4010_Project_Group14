@@ -503,8 +503,23 @@ class RLMusicBotEnv(gym.Env):
         )
 
         if self.debug:
-            print(f"Reward Breakdown -- Rhythm: {rhythm_norm:.3f}, Harmony: {harmony_norm:.3f}, Progression: {progression_norm:.3f}, Repetition: {repetition_norm:.3f} => Final: {final_reward:.3f}")
-           
+            # Get detected chords for display
+            detected_chords = [self._detect_chord(bar) for bar in musical_score]
+            chords_str = ", ".join([str(c) if c else "None" for c in detected_chords])
+            
+            print("\n" + "="*60)
+            print(f"REWARD")
+            print("="*60)
+            print(f"Overall: {final_reward:.4f}")
+            print(f"  Rhythm:      {rhythm_norm:.4f}")
+            print(f"  Harmony:     {harmony_norm:.4f}")
+            print(f"  Progression: {progression_norm:.4f}")
+            print(f"    - Chords: [{chords_str}]")
+            print(f"  Repetition:  {repetition_norm:.4f}")
+            print(f"    - Motif:   {repetition_motif_score:.4f}")
+            print(f"    - Bar:     {repetition_bar_score:.4f}")
+            print(f"    - Rhythm:  {repetition_rhythm_score:.4f}")
+            print("="*60 + "\n")
         # Return both final reward and breakdown dictionary
         return final_reward, {
             'rhythm': rhythm_norm,

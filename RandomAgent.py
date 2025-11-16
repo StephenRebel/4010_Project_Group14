@@ -5,19 +5,6 @@ from stable_baselines3.common.env_checker import check_env
 
 env = RLMusicBotEnv(bars=4)
 
-twinkle_twinkle_score = [
-    [(60, 1.0, 0.8), (60, 1.0, 0.8), (67, 1.0, 0.8), (67, 1.0, 0.8)],
-    [(69, 1.0, 0.8), (69, 1.0, 0.8), (67, 2.0, 0.8)],
-    [(65, 1.0, 0.8), (65, 1.0, 0.8), (64, 1.0, 0.8), (64, 1.0, 0.8)],
-    [(62, 1.0, 0.8), (62, 1.0, 0.8), (60, 2.0, 0.8)]
-]
-
-reward = env._compute_reward(
-    musical_score=twinkle_twinkle_score
-)
-
-print("Reward for Twinkle Twinkle:", reward)
-
 #PPO
 # ppo_env = RLMusicBotEnv(bars=8, render_mode="none")
 # ppo_model = PPO("MlpPolicy", ppo_env, verbose=1)
