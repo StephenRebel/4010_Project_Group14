@@ -1,109 +1,82 @@
-from collections import defaultdict, Counter
 import numpy as np
+import nltk
+from nltk.lm.preprocessing import padded_everygram_pipeline
+from nltk.lm import Laplace
+from nltk.lm.vocabulary import Vocabulary
+
 from baseline_env_utils import note_id_from_action
+
+# Following from: https://www.nltk.org/api/nltk.lm.html
 
 class NGramMusicModel:
     def __init__(self, n, vocab_size):
-        self.n = n
-        self.vocab_size = vocab_size
-        self.counts = defaultdict(Counter)
+        self.ngram_size = n
+        self.vocab_size = vocab_size # total span of tokens from Gymnasium env
 
-    def fit(self, sequences):
-        for sequence in sequences:
-            note_context = [-1] * (self.n - 1)
-            for a in sequence:
-                self.counts[tuple(note_context)][a] += 1
-                note_context = (note_context + [a])[-(self.n - 1):]
+        self.train = None
+        self.tokens = list(range(self.vocab_size)) + ["<s>", "</s>"] # Possible range from Gymnasium env + the start and stop tokens of NLTK
+        self.vocab = Vocabulary(self.tokens)
 
-    def get_probs(self, note_context):
-        freq_counter = self.counts.get(tuple(note_context), None)
-        if freq_counter is None:
-            return np.ones(self.vocab_size) / float(self.vocab_size)
-        freqs = np.array([freq_counter.get(i, 0) + 1 for i in range(self.vocab_size)], dtype=float)
+        self.ngram_model = Laplace(self.ngram_size, vocabulary=self.vocab)
 
-        return freqs / freqs.sum()
-    
-    # Guarentee the same format ensured by the gymnasium environment. More difficult to capture with external models
-    def sample_sequence(self, start_ctx=None, eos_id=None, env=None):
+    def fit(self, dataset):
+        train, _ = padded_everygram_pipeline(self.ngram_size, dataset)
+        self.train = train
+
+        self.ngram_model.fit(self.train, self.vocab)
+
+    def sample_sequence(self, num_bars=4, random_seed=None, env=None):
+        if random_seed is not None:
+            np.random.seed(random_seed)
+
         if env is None:
             raise ValueError("Must be provided a gymnasium environment for sampling")
 
-        if start_ctx is None:
-            note_context = [-1] * (self.n - 1)
-        else:
-            note_context = start_ctx[-(self.n - 1):]
+        composition = [[]]
+        action_context = ["<s>"] * (self.ngram_size - 1)
 
-        # Tracking state vars
-        out = []
         current_bar = 0
-        current_beats = 0.0
-        beats_per_bar = env.beats_per_bar
-        num_bars = env.bars
+        current_beat = 0.0
+        beats_per_bar = 4
 
-        # NOTE may need to consider hard limit but should end
         while current_bar < num_bars:
-            probs = self.get_probs(note_context).copy()
+            remaining_beats = beats_per_bar - current_beat
 
-            remaining_beats = beats_per_bar - current_beats
+            # Filter probabilities to take valid actions
+            valid_actions = np.zeros(self.vocab_size, dtype=bool)
+            action_probs = np.zeros(self.vocab_size)
+            for action in range(self.vocab_size):
+                _, duration_id, _ = note_id_from_action(action, env)
+                duration = env.durations[duration_id]
 
-            # Main filtering loop
-            for i in range(self.vocab_size):
-                if i == eos_id:
-                    # Eos only for the end
-                    if not (current_bar == num_bars - 1 and remaining_beats == 0):
-                        probs[i] = 0
-                else:
-                    _, duration_id, _ = note_id_from_action(i, env)
-                    duration = env.durations[duration_id]
+                # Collection all valid actions and their probabilities (could be 0)
+                if duration <= remaining_beats:
+                    valid_actions[action] = True
+                    action_probs[action] = self.ngram_model.score(action, action_context)
 
-                    # Filter valid actions, or moving to next bar
-                    if remaining_beats > 0:
-                        if duration > remaining_beats:
-                            probs[i] = 0
-                    else:
-                        if current_bar == num_bars - 1:
-                            probs[i] = 0
+            action_probs[~valid_actions] == 0.0
 
-            # Handle no valid actions in learned set
-            if probs.sum() == 0:
-                if current_bar == num_bars - 1 and remaining_beats == 0:
-                    if eos_id is not None:
-                        out.append(eos_id)
-                    break
-                else:
-                    # Fall back to force a rest with suitable duration
-                    forced = []
-                    for i in range(self.vocab_size):
-                        pitch_id, duration_id, _ = note_id_from_action(i, env)
-                        duration = env.durations[duration_id]
-                        if pitch_id == env.rest_action and (remaining_beats == 0 or duration <= remaining_beats):
-                            forced.append(i)
-                    if forced:
-                        prob_val = 1.0 / len(forced)
-                        for i in forced:
-                            probs[i] = prob_val
-                    else:
-                        # Uniformly random action worst case (ignores masking)
-                        probs = np.ones(self.vocab_size) / self.vocab_size
+            # Handle no learned transitions for current action_context
+            if action_probs.sum() == 0:
+                possible_actions = valid_actions.astype(float)
 
-            # Final normalization of probabilities
-            if probs.sum() > 0:
-                probs /= probs.sum()
+                action_probs = possible_actions
 
-            next_action = np.random.choice(range(self.vocab_size), p=probs)
-            out.append(int(next_action))
+            action_probs = action_probs / action_probs.sum()
+            action = np.random.choice(self.vocab_size, p=action_probs)
 
-            if eos_id is not None and next_action == eos_id:
-                break
+            composition[current_bar].append(action)
+            action_context = action_context[1:] + [action]
 
-            note_context = (note_context + [next_action])[-(self.n - 1):]
+            _, action_duration_id, _ = note_id_from_action(action, env)
+            action_duration = env.durations[duration_id]
+            current_beat += action_duration
 
-            # Track state for filling out simulated musical score
-            _, duration_id, _ = note_id_from_action(next_action, env)
-            duration = env.durations[duration_id]
-            if current_beats + duration > env.beats_per_bar:
+            if current_beat >= beats_per_bar:
                 current_bar += 1
-                current_beats = 0.0
-            current_beats += duration
+                current_beat = 0.0
+                if current_bar != num_bars:
+                    composition.append([])
 
-        return out
+        return composition
+    
