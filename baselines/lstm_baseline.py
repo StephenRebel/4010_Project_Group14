@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-from baseline_env_utils import EOS_ID, note_id_from_action
+from baselines.baseline_env_utils import EOS_ID, note_id_from_action
 import os
 import numpy as np
 

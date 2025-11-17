@@ -1,6 +1,6 @@
 import random
 from RLMusicEnv import RLMusicBotEnv
-from baseline_env_utils import musical_score_to_actions
+from baselines.baseline_env_utils import musical_score_to_actions
 from tqdm import tqdm
 import json
 

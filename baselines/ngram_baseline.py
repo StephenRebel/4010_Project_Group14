@@ -4,7 +4,7 @@ from nltk.lm.preprocessing import padded_everygram_pipeline
 from nltk.lm import Laplace
 from nltk.lm.vocabulary import Vocabulary
 
-from baseline_env_utils import note_id_from_action
+from baselines.baseline_env_utils import note_id_from_action
 
 # Following from: https://www.nltk.org/api/nltk.lm.html
 
@@ -14,7 +14,7 @@ class NGramMusicModel:
         self.vocab_size = vocab_size # total span of tokens from Gymnasium env
 
         self.train = None
-        self.tokens = list(range(self.vocab_size)) + ["<s>", "</s>"] # Possible range from Gymnasium env + the start and stop tokens of NLTK
+        self.tokens = list(map(str, range(self.vocab_size))) + ["<s>", "</s>"] # Possible range from Gymnasium env + the start and stop tokens of NLTK
         self.vocab = Vocabulary(self.tokens)
 
         self.ngram_model = Laplace(self.ngram_size, vocabulary=self.vocab)
@@ -32,7 +32,7 @@ class NGramMusicModel:
         if env is None:
             raise ValueError("Must be provided a gymnasium environment for sampling")
 
-        composition = [[]]
+        composition = []
         action_context = ["<s>"] * (self.ngram_size - 1)
 
         current_bar = 0
@@ -52,8 +52,9 @@ class NGramMusicModel:
                 # Collection all valid actions and their probabilities (could be 0)
                 if duration <= remaining_beats:
                     valid_actions[action] = True
-                    action_probs[action] = self.ngram_model.score(action, action_context)
+                    action_probs[action] = self.ngram_model.score(str(action), action_context)
 
+            # Ensure invalid actions set to 0 probability
             action_probs[~valid_actions] == 0.0
 
             # Handle no learned transitions for current action_context
@@ -65,18 +66,16 @@ class NGramMusicModel:
             action_probs = action_probs / action_probs.sum()
             action = np.random.choice(self.vocab_size, p=action_probs)
 
-            composition[current_bar].append(action)
-            action_context = action_context[1:] + [action]
+            composition.append(action)
+            action_context = action_context[1:] + [str(action)]
 
             _, action_duration_id, _ = note_id_from_action(action, env)
-            action_duration = env.durations[duration_id]
+            action_duration = env.durations[action_duration_id]
             current_beat += action_duration
 
             if current_beat >= beats_per_bar:
                 current_bar += 1
                 current_beat = 0.0
-                if current_bar != num_bars:
-                    composition.append([])
 
         return composition
     
