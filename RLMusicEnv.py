@@ -106,7 +106,7 @@ class RLMusicBotEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(self.n_pitches * self.n_durations * self.n_volumes)
 
         #Define the observation space
-        self.MAX_NOTES_PER_BAR = 16
+        self.MAX_NOTES_PER_BAR = int(self.beats_per_bar / self.durations[0])
         obs_shape = (self.bars * self.MAX_NOTES_PER_BAR * 3 + 1,)
         self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=obs_shape, dtype=np.float32)
 
@@ -220,11 +220,12 @@ class RLMusicBotEnv(gym.Env):
 
         done = self.current_bar >= self.bars
         
-        # For now reward structure 0 unless at terminal state, i.e. only reward
+        #For now reward structure 0 unless at terminal state, i.e. only reward
         if done:
-            reward = self._compute_reward(self._musical_score)
+            reward, reward_info = self._compute_reward(self._musical_score, debug=self.debug)
         else:
             reward = 0.0
+            reward_info = {}
 
         obs = self._get_obs()
         info = {'current_chord': self.current_bar_chord}
@@ -268,7 +269,7 @@ class RLMusicBotEnv(gym.Env):
 
     # Function to compute the reward for the current state of the environment
     # Combination of scale adherence, repetition, and rhythm.    
-    def _compute_reward(self, musical_score):
+    def _compute_reward(self, musical_score, debug=False):
         # Rhythm reward section, may have to look at datasets of MIDI for some of these parameters
         subdivisions = 4 # allowing 16th notes above
         min_note_duration = 0.25
@@ -298,7 +299,12 @@ class RLMusicBotEnv(gym.Env):
         total_notes_played = len(notes_played)
         # If no notes played that's bad
         if total_notes_played == 0:
-            return -1.0
+            return 0.0, {
+            'rhythm': 0.0,
+            'harmony': 0.0,
+            'progression': 0.0,
+            'repetition': 0.0,
+        }
 
         # Notes played on interger (quarter note) beats, and notes played off intergers beats
         quarter_beat_notes = sum(1 for idx in notes_played if (idx % subdivisions) == 0)
@@ -511,7 +517,7 @@ class RLMusicBotEnv(gym.Env):
             0.1 * repetition_norm
         )
 
-        if self.debug:
+        if debug:
             # Get detected chords for display
             detected_chords = [self._detect_chord(bar) for bar in musical_score]
             chords_str = ", ".join([str(c) if c else "None" for c in detected_chords])
