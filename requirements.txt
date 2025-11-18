@@ -11,3 +11,4 @@ pandas==2.1.0
 gymnasium==0.29.1
 tqdm==4.67.1
 nltk==3.9.2
+scikit-learn==1.7.2

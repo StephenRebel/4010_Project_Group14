@@ -4,7 +4,7 @@ from nltk.lm.preprocessing import padded_everygram_pipeline
 from nltk.lm import Laplace
 from nltk.lm.vocabulary import Vocabulary
 
-from baselines.baseline_env_utils import note_id_from_action
+from .baseline_env_utils import note_id_from_action
 
 # Following from: https://www.nltk.org/api/nltk.lm.html
 
@@ -37,7 +37,7 @@ class NGramMusicModel:
 
         current_bar = 0
         current_beat = 0.0
-        beats_per_bar = 4
+        beats_per_bar = env.beats_per_bar
 
         while current_bar < num_bars:
             remaining_beats = beats_per_bar - current_beat
@@ -58,13 +58,14 @@ class NGramMusicModel:
             action_probs[~valid_actions] == 0.0
 
             # Handle no learned transitions for current action_context
-            if action_probs.sum() == 0:
+            if np.sum(action_probs) == 0:
                 possible_actions = valid_actions.astype(float)
 
                 action_probs = possible_actions
 
-            action_probs = action_probs / action_probs.sum()
-            action = np.random.choice(self.vocab_size, p=action_probs)
+            # Normalize to proper probability vector
+            action_probs = action_probs / np.sum(action_probs)
+            action = int(np.random.choice(self.vocab_size, p=action_probs))
 
             composition.append(action)
             action_context = action_context[1:] + [str(action)]

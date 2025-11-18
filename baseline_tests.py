@@ -1,39 +1,133 @@
 import json
+import torch
 
 from baselines.ngram_baseline import NGramMusicModel
+from baselines.lstm_baseline import LSTMMusicModel
+
 from RLMusicEnv import RLMusicBotEnv
-from baselines.baseline_env_utils import actions_to_musical_score
+from baselines.baseline_env_utils import actions_to_musical_score, save_score_to_midi, EOS_ID
 
 # Seed if needed
 SEED = 42
+N_RUNS = 100
 
 # Env Parameters
 NUM_BARS = 16
-
 env = RLMusicBotEnv(bars=NUM_BARS)
 
 # Model Parameters
 NGRAM_SIZE = 3
-VOCAB_SIZE = env.action_space.n
+VOCAB_SIZE_NGRAM = env.action_space.n
+VOCAB_SIZE_LSTM = env.action_space.n + 1 # +1 for EOS token
 
-# NLTK expects list of lists for dataset
-baseline_data = []
+# Paths
+LSTM_MODEL_PATH = "baselines/models/best_lstm.pth"
+DATASET_PATH = "baselines/baseline_dataset.jsonl"
 
-with open("baselines/baseline_dataset.jsonl", "r") as df:
-    for line in df:
-        json_line = json.loads(line)
-        baseline_data.append(list(map(str, json_line["composition_actions"])))
-print("Processed dataset")
+def load_ngram(dataset_path):
+    # NLTK expects list of lists for dataset
+    baseline_data = []
 
-# Create the model
-ngram_music_model = NGramMusicModel(n=NGRAM_SIZE, vocab_size=VOCAB_SIZE)
-ngram_music_model.fit(baseline_data)
+    with open(dataset_path, "r") as df:
+        for line in df:
+            json_line = json.loads(line)
+            baseline_data.append(list(map(str, json_line["composition_actions"])))
+    print("Processed dataset")
 
-# Generate sequence(s)
-composition_actions = ngram_music_model.sample_sequence(num_bars=env.bars, random_seed=SEED, env=env)
-print(f"Generated actions:\n{composition_actions}")
+    # Create the model
+    ngram_music_model = NGramMusicModel(n=NGRAM_SIZE, vocab_size=VOCAB_SIZE_NGRAM)
+    ngram_music_model.fit(baseline_data)
 
+    return ngram_music_model
 
-music_score = actions_to_musical_score(list(map(int, composition_actions)), env, None)
+def test_ngram(env, full_test=False):
+    ngram_model = load_ngram(DATASET_PATH)
 
-print(f"Generated score:\n{music_score}")
+    if not full_test:
+        # Single sample and save as midi
+        print("Testing NGram single sequence:\n")
+
+        composition_actions = ngram_model.sample_sequence(num_bars=env.bars, random_seed=None, env=env)
+        print(f"Generated actions:\n{composition_actions}")
+
+        music_score = actions_to_musical_score(composition_actions, env, None)
+
+        print(f"Generated score:\n{music_score}")
+        avg_reward, breakdown = env._compute_reward(music_score)
+        print(f"Reward: {avg_reward}\nBreakdown:\n{breakdown}")
+
+        save_score_to_midi("baselines/ngram_generation_sample.mid", music_score)
+    else:
+        # Avg reward achieved by the ngram model over N_RUNS runs
+        print(f"Testing NGRAM over {N_RUNS} sequences...\n")
+
+        rewards = []
+        for i in range(N_RUNS):
+            composition_actions = ngram_model.sample_sequence(num_bars=env.bars, random_seed=None, env=env)
+            music_score = actions_to_musical_score(composition_actions, env, None)
+
+            reward = env._compute_reward(music_score)[0]
+            rewards.append(reward)
+
+        avg_reward = sum(rewards) / N_RUNS
+        print(f"Average reward achieved over {N_RUNS} runs: {avg_reward:.3f}\n")
+
+    return avg_reward
+
+def load_lstm(path, device):
+    # Match to training parameters
+    model = LSTMMusicModel(
+        VOCAB_SIZE_LSTM,
+        embed_size=32,
+        hidden_size=128,
+        dropout=0.4
+    )
+
+    model.load_state_dict(torch.load(path, map_location=device))
+    model.to(device)
+    model.eval()
+    return model
+
+def test_lstm(env, full_test=False):
+    from baselines.lstm_baseline import sample_from_lstm
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    lstm_model = load_lstm(LSTM_MODEL_PATH, device)
+
+    if not full_test:
+        # Single sample and save as midi
+        print("Testing LSTM single sequence:\n")
+
+        composition_actions = sample_from_lstm(model=lstm_model, env=env, num_bars=env.bars, device=device, random_seed=None)
+        print(f"Generated actions:\n{composition_actions}")
+
+        music_score = actions_to_musical_score(composition_actions, env, None)
+
+        print(f"Generated score:\n{music_score}")
+        avg_reward, breakdown = env._compute_reward(music_score)
+        print(f"Reward: {avg_reward}\nBreakdown:\n{breakdown}")
+
+        save_score_to_midi("baselines/lstm_generation_sample.mid", music_score)
+    else:
+        # Avg reward achieved by the ngram model over N_RUNS runs
+        print(f"Testing LSTM over {N_RUNS} sequences...\n")
+
+        rewards = []
+        for i in range(N_RUNS):
+            composition_actions = sample_from_lstm(model=lstm_model, env=env, num_bars=env.bars, device=device)
+            music_score = actions_to_musical_score(composition_actions, env, None)
+
+            reward = env._compute_reward(music_score)[0]
+            rewards.append(reward)
+
+        avg_reward = sum(rewards) / N_RUNS
+        print(f"Average reward achieved over {N_RUNS} runs: {avg_reward:.3f}\n")
+
+    return avg_reward
+
+if __name__ == "__main__":
+
+    test_ngram(env, full_test=True)
+
+    test_lstm(env, full_test=True)

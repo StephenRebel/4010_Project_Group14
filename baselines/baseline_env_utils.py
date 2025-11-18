@@ -57,9 +57,36 @@ def actions_to_musical_score(actions, env, eos_token=EOS_ID):
     
     return musical_score
 
-def model_vocab_mapping(dataset, env):
-    eos_id = EOS_ID
-    mapping = [sequence + [eos_id] for sequence in dataset]
-    vocab_size = eos_id + 1
+def model_vocab_mapping(dataset):
+    mapping = [sequence + [EOS_ID] for sequence in dataset]
+    vocab_size = EOS_ID + 1
 
-    return mapping, eos_id, vocab_size
+    return mapping, vocab_size
+
+def save_score_to_midi(filename, score, tempo=120):
+    import pretty_midi
+
+    pm = pretty_midi.PrettyMIDI()
+    instrument = pretty_midi.Instrument(program=0)  # Acoustic Grand Piano
+    seconds_per_beat = 60.0 / tempo
+
+    current_time = 0.0
+    for bar in score:
+        for (pitch, duration, volume) in bar:
+            if pitch is None:
+                # Rest — skip ahead in time
+                current_time += duration * seconds_per_beat
+                continue
+
+            note = pretty_midi.Note(
+                velocity=int(volume * 127),
+                pitch=int(pitch),
+                start=current_time,
+                end=current_time + duration * seconds_per_beat
+            )
+            instrument.notes.append(note)
+            current_time += duration * seconds_per_beat
+
+    pm.instruments.append(instrument)
+    pm.write(filename)
+    print(f"Saved generated music to {filename}")
