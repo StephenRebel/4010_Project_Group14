@@ -11,3 +11,7 @@ Drax:
     - NCT non-chord tones introduction for harmony reward
     - Reptition reward fixes - accounts for more instances of repetition
     - Todo: more harmony rewards for complex NCTS, add more sample songs to benchmarks
+
+Saagar:
+    - working on rewards scheme
+    - still trying to figure logic out
