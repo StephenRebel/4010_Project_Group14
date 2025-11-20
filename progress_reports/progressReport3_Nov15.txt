@@ -16,7 +16,7 @@ Saagar:
     - working on the chord detection scheme, mainly trying to figure out the chord detection still. 
        -  This is due to a recent bug in the detection of the chords, where Twinkle Little Star is not showing the real chord progression. 
        -  This led me to start the rework of the detect chord functionn. 
-    - still trying to figure logic out, but have narrowed it down to naive not counting in a sense where the chord detection function just counts how many notes were matching each chord. 
+    - still trying to figure logic out, but have narrowed it down to the chord detection function using naive note counting, in a sense where the chord detection function just counts how many notes match each chord. 
         - This leads to the incorrect chord being chosen; even though it should be C major, we get Dm.
     - to solve, I am trying to improve the version which will use beat weighting, maybe even duration weighting.
 
