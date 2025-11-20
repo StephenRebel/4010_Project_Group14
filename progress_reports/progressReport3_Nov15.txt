@@ -15,3 +15,35 @@ Drax:
 Saagar:
     - working on rewards scheme
     - still trying to figure logic out
+
+TA Comments:
+@ Stephen 
+Training the n-gram and LSTM models on random rollouts from the environment will unfortunately cap their performance at “random,” which makes comparison against the RL models less meaningful. The point of the baselines is that it should be purely data-driven approach to melody modelling.
+Here are a couple better approaches for collecting data that will give your baselines something real to learn:
+1. Use a small curated corpus of symbolic melodies (recommended)
+Pick a handful of 4-bar monophonic MIDI melodies in a fixed key (C major or minor). Magenta, Nottingham Dataset, or even a few hand-picked folk melodies work fine.
+Convert to note sequences (pitch, duration).
+Train the n-gram and LSTM models to model these sequences.
+This gives them a meaningful statistical structure to learn — scale conformity, rhythmic motifs, repetition, etc.
+This is the typical way n-gram/LSTM baselines are used in music-generation research.
+
+2. Use heuristic-generated melodies, but not random
+If you prefer synthetic data, generate sequences using your simple heuristic rules:
+stay in scale
+prefer stepwise motion
+choose durations from a small rhythmic vocabulary
+This produces “sensible but simple” melodies that are still learnable.
+
+You’ll then be comparing:
+Data-driven learners (n-gram, LSTM) trained on a real distribution vs RL agents that start from scratch but get better via your reward shaping
+This makes your evaluation meaningful. 
+TL;DR
+Random-environment data isn’t sufficient. Give the baselines structured melodic data — either from a small MIDI corpus or a heuristic generator; so they can actually model something.
+
+
+@ Danial reply back here on what are the results looking like? what are potential issues?
+@ Saagar what exactly have you worked related to reward scheme, mention concrete steps you have taken. 
+
+@ All your report update is late and not very clear. Every student is supposed to be very clear in what they have done. Please add refined comments following my comments here in the same file. You can be brief and to the point. Thanks
+
+Adnan
