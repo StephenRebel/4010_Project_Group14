@@ -13,14 +13,24 @@ from .baseline_env_utils import EOS_ID, note_id_from_action, model_vocab_mapping
 # https://colab.research.google.com/gist/SauravMaheshkar/168f0817f0cd29dd4048868fb0dd4401/lstms-in-pytorch.ipynb#scrollTo=Wuss5ZGQ9r0x
 # https://docs.pytorch.org/docs/stable/generated/torch.nn.LSTM.html
 
+# All configs
+DATASET_PATH = "baseline_dataset_midi.jsonl"
+SAVE_PATH = "models/best_lstm.pth"
 PAD = EOS_ID
-save_path = "models/best_lstm.pth"
 SEED = 42
+CHUNK_SIZE = 64
 
 # Dataset representation of composition actions
 class CompositionDataset(Dataset):
-    def __init__(self, compositions):
-        self.compositions = compositions
+    # Add chunking due to the varibale and long size of songs from Nottingham dataset
+    def __init__(self, compositions, chunk_size=64):
+        self.compositions = []
+
+        for composition in compositions:
+            for i in range(0, len(composition) - chunk_size, chunk_size):
+                chunk = composition[i:i + chunk_size + 1]
+
+                self.compositions.append(chunk)
 
     def __len__(self):
         return len(self.compositions)
@@ -30,7 +40,7 @@ class CompositionDataset(Dataset):
     
 # Transforms batch into useable training form
 def collate_fn(batch):
-    lengths = [b.size(0) for b in batch]
+    lengths = [len(b) for b in batch]
     max_len = max(lengths)
     padded_batch = torch.full((len(batch), max_len), PAD, dtype=torch.long)
 
@@ -44,10 +54,10 @@ def collate_fn(batch):
 
 class LSTMMusicModel(nn.Module):
     # Simple LSTM for sequence generation
-    def __init__(self, vocab_size, embed_size=64, hidden_size=256, dropout=0.2):
+    def __init__(self, vocab_size, embed_size=128, hidden_size=256, layers=1, dropout=0.3):
         super(LSTMMusicModel, self).__init__()
-        self.embed = nn.Embedding(vocab_size, embed_size)
-        self.lstm = nn.LSTM(embed_size, hidden_size, batch_first=True)
+        self.embed = nn.Embedding(vocab_size, embed_size, padding_idx=PAD)
+        self.lstm = nn.LSTM(embed_size, hidden_size, num_layers=layers, batch_first=True, dropout=dropout)
         self.dropout = nn.Dropout(p=dropout)
         self.fc = nn.Linear(hidden_size, vocab_size)
     
@@ -58,9 +68,9 @@ class LSTMMusicModel(nn.Module):
         logits = self.fc(out)
         return logits, hidden_x
     
-def train_loop(model, train_loader, val_loader, epochs=20, lr=1e-3, device='cpu', save_path="best_lstm.pth"):
+def train_loop(model, train_loader, val_loader, epochs=20, lr=1e-3, weight_decay=1e-4, device='cpu', save_path="best_lstm.pth"):
     # Standard training loop for LSTM, save best model
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     loss_fn = nn.CrossEntropyLoss(ignore_index=PAD)
     model.to(device)
 
@@ -116,7 +126,7 @@ def eval_loss(model, loader, device):
     return total_loss / len(loader)
 
 # Guarentee the same format ensured by the gymnasium environment. More difficult to capture with external models
-def sample_from_lstm(model, env=None, num_bars=None, temperature=1.0, device='cpu', random_seed=None):
+def sample_from_lstm(model, env=None, num_bars=8, temperature=1.0, device='cpu', random_seed=None):
     if env is None:
         raise ValueError("Must be provided a gymnasium environment for sampling")
 
@@ -136,7 +146,28 @@ def sample_from_lstm(model, env=None, num_bars=None, temperature=1.0, device='cp
     vocab_size = model.fc.out_features
 
     # Start with a dummy initial input set to PAD or whatever used in training
-    last_action = torch.tensor([[PAD]], dtype=torch.long, device=device)
+    start_actions = []
+    for action in range (vocab_size):
+        if action == EOS_ID:
+            continue
+
+        _, _, volume_id = note_id_from_action(action, env)
+
+        # Dataset generated with only volume-0.8, id 2 so likely to be confused if satrting with other volume
+        if volume_id == 2:
+            start_actions.append(action)
+
+    start_action = np.random.choice(start_actions)
+    last_action = torch.tensor([[start_action]], dtype=torch.long, device=device)
+
+    # Add start aciton and make sure it does cause us to starta new bar (whole note)
+    composition.append(start_action)
+    _, duration_id, _ = note_id_from_action(start_action, env)
+    current_beat += env.durations[duration_id]
+
+    if current_beat >= beats_per_bar:
+        current_bar += 1
+        current_beat = 0.0
 
     with torch.no_grad():
         # NOTE may need to consider hard limit but should end
@@ -193,7 +224,7 @@ def load_and_process_dataset(path):
     with open(path, "r") as df:
         for line in df:
             json_line = json.loads(line)
-            baseline_data.append(json_line["composition_actions"])
+            baseline_data.append(json_line["actions"])
 
     processed_data, vocab_size = model_vocab_mapping(baseline_data)
 
@@ -205,20 +236,23 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Training hyperparameters
-    BATCH_SIZE = 32
-    EPOCHS = 20
-    LEARNING_RATE = 5e-3 # default for Adam Optimizer 1e-3
+    BATCH_SIZE = 16
+    EPOCHS = 50
+    LEARNING_RATE = 1e-3 # default for Adam Optimizer 1e-3
     EMBED_SIZE = 32
     HIDDEN_SIZE = 128
-    DROPOUT = 0.4
+    MODEL_LAYERS = 1
+    DROPOUT = 0.5
+    WEIGHT_DECAY = 1e-4
 
     # Build dataset and loaders
-    data_path = "baseline_dataset.jsonl"
-    train_data, val_data, vocab_size = load_and_process_dataset(data_path)
+    train_data, val_data, vocab_size = load_and_process_dataset(DATASET_PATH)
     train_loader = DataLoader(CompositionDataset(train_data), batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_fn)
     val_loader = DataLoader(CompositionDataset(val_data), batch_size=BATCH_SIZE, collate_fn=collate_fn)
 
+    print(f"Num training samples: {len(train_loader)}, num val samples: {len(val_loader)}")
+
     # Creat and train model
-    model = LSTMMusicModel(vocab_size=vocab_size, embed_size=EMBED_SIZE, hidden_size=HIDDEN_SIZE, dropout=DROPOUT)
-    trained_model = train_loop(model, train_loader, val_loader, epochs=EPOCHS, lr=LEARNING_RATE, device=device, save_path=save_path)
+    model = LSTMMusicModel(vocab_size=vocab_size, embed_size=EMBED_SIZE, hidden_size=HIDDEN_SIZE, layers=MODEL_LAYERS, dropout=DROPOUT)
+    trained_model = train_loop(model, train_loader, val_loader, epochs=EPOCHS, lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY, device=device, save_path=SAVE_PATH)
 

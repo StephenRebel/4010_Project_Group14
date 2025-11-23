@@ -9,7 +9,7 @@ from .baseline_env_utils import note_id_from_action
 # Following from: https://www.nltk.org/api/nltk.lm.html
 
 class NGramMusicModel:
-    def __init__(self, n, vocab_size):
+    def __init__(self, n=2, vocab_size=None):
         self.ngram_size = n
         self.vocab_size = vocab_size # total span of tokens from Gymnasium env
 
@@ -20,7 +20,7 @@ class NGramMusicModel:
         self.ngram_model = Laplace(self.ngram_size, vocabulary=self.vocab)
 
     def fit(self, dataset):
-        train, _ = padded_everygram_pipeline(self.ngram_size, dataset)
+        train, padded_vocab = padded_everygram_pipeline(self.ngram_size, dataset)
         self.train = train
 
         self.ngram_model.fit(self.train, self.vocab)
@@ -46,8 +46,12 @@ class NGramMusicModel:
             valid_actions = np.zeros(self.vocab_size, dtype=bool)
             action_probs = np.zeros(self.vocab_size)
             for action in range(self.vocab_size):
-                _, duration_id, _ = note_id_from_action(action, env)
+                _, duration_id, volume_id = note_id_from_action(action, env)
                 duration = env.durations[duration_id]
+
+                # Ensure only volume=0.2 (id=2) are selected since that is all learned
+                if volume_id != 2:
+                    continue
 
                 # Collection all valid actions and their probabilities (could be 0)
                 if duration <= remaining_beats:
@@ -55,7 +59,7 @@ class NGramMusicModel:
                     action_probs[action] = self.ngram_model.score(str(action), action_context)
 
             # Ensure invalid actions set to 0 probability
-            action_probs[~valid_actions] == 0.0
+            action_probs[~valid_actions] = 0.0
 
             # Handle no learned transitions for current action_context
             if np.sum(action_probs) == 0:
@@ -68,7 +72,8 @@ class NGramMusicModel:
             action = int(np.random.choice(self.vocab_size, p=action_probs))
 
             composition.append(action)
-            action_context = action_context[1:] + [str(action)]
+            action_context.pop(0)
+            action_context.append(str(action))
 
             _, action_duration_id, _ = note_id_from_action(action, env)
             action_duration = env.durations[action_duration_id]
