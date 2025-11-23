@@ -51,3 +51,14 @@ Random-environment data isn’t sufficient. Give the baselines structured melodi
 @ All your report update is late and not very clear. Every student is supposed to be very clear in what they have done. Please add refined comments following my comments here in the same file. You can be brief and to the point. Thanks
 
 Adnan
+
+Stephen refined comments:
+    - Adressed comments about motivation and project background in README file creating more descriptive and proper format
+    - Created a pipeline for collecting random sequences of actions for the prupose of benchmarking, and testing methods (deprecated)
+    - Worked on the creation of an N-Gram model employing NLTK to learn sequences of notes and generate new ones
+    - Defined a simple LSTM model and training pipeline in PyTorch to learn and generate musical sequences according to the Gymnasium environment
+    
+    Updates as per Adnan's comments:
+    - Created a script to collect a training dataset from the Nottingham melody music dataset. Drop songs with incompatible time signatures
+        or those without a single melody. Transpose notes to fit our defined scale.
+    - Update training and generation scripts to use this new dataset and recompute metrics.
