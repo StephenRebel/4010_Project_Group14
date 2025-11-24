@@ -45,19 +45,24 @@ class CallbackFunction(BaseCallback):
 
         return True
     
-    def plot_episode_rewards(ep_rewards, label="Model", smooth=20):
+    def plot_episode_rewards(ep_rewards, label="Model", smooth=20, filename="graphs/graph.png"):
         rewards = np.array(ep_rewards)
 
         if len(rewards) >= smooth:
             avg = np.convolve(rewards, np.ones(smooth)/smooth, mode='valid')
+            x = np.arange(smooth - 1, len(rewards))
         else:
             avg = rewards
+            x = np.arange(len(rewards))
 
-        plt.plot(avg, label=label, linewidth=1.5)
+        plt.plot(x, avg, label=label, linewidth=1.5)
         plt.xlabel("Episode")
         plt.ylabel("Episode Reward")
         plt.title("Episode Reward Over Training")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        plt.savefig(filename)
         plt.show()
+        plt.close() 

@@ -10,11 +10,11 @@ class RLAgent:
             args = {}
         self.model = agent_type("MlpPolicy", env, verbose=1, **args)
 
-    def train(self, total_timesteps=int(1e6), max_episodes=10000):
+    def train(self, total_timesteps=int(1e6), max_episodes=10000, filename=""):
         callback = CallbackFunction(max_episodes=max_episodes)
         self.model.learn(total_timesteps=total_timesteps, callback=callback)
         episode_rewards = callback.episode_rewards
-        CallbackFunction.plot_episode_rewards(episode_rewards, label="Model", smooth=20)
+        CallbackFunction.plot_episode_rewards(episode_rewards, label="Model", smooth=20, filename=filename)
         self.save(self.save_path)
 
     def test(self, render=True, midi_filename=None, debug=False):

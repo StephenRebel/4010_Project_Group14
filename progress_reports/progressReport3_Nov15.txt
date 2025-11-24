@@ -62,3 +62,10 @@ Stephen refined comments:
     - Created a script to collect a training dataset from the Nottingham melody music dataset. Drop songs with incompatible time signatures
         or those without a single melody. Transpose notes to fit our defined scale.
     - Update training and generation scripts to use this new dataset and recompute metrics.
+
+Danial refine comments:
+    - Right now we have made graphs plotting episodes and rewards for both our training models. 
+    - The PPO model looks fairly promising, with the reward increasing as the episodes increase. 
+    - The DQN is less promising, as it currently doesn't have a concrete relation between episodes and rewards, clearly showing that there is something wrong with our reward structure. 
+    - Another thing that shows that our reward structure is flawed, is that PPO and DQN produce very contrasting results, with the PPO only using whole notes, and DQN spamming 16th notes. 
+    - On top of this, when using our reward function on nursery rhymes, we get lower than expected results, so our goal is to fix our reward structure so that these types of songs will achieve higher scores.
