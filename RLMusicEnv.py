@@ -457,12 +457,12 @@ class RLMusicBotEnv(gym.Env):
             progression_score /= valid_transitions
 
         # Repetition reward
-        # 1. Motif repetition (melodic n-grams)
+        # 1. Motif repetition (melodic n-grams including rests)
         sequence = []
         for bar in musical_score:
             for (pitch, duration, volume) in bar:
-                if pitch is not None:
-                    sequence.append(pitch)
+                # Include rests (None) to recognize rest patterns in motifs
+                sequence.append(pitch)
 
         repetition_motif_score = 0.0
         if len(sequence) >= 2:
@@ -491,12 +491,13 @@ class RLMusicBotEnv(gym.Env):
         bar_repetition_ratio = repeated_bars / len(bar_counts) if len(bar_counts) > 0 else 0
         repetition_bar_score = bar_repetition_ratio ** 0.5
 
-        # 3. Rhythm repetition: proportion of bars matching the most common rhythm pattern
+        # 3. Rhythm repetition: proportion of rhythm patterns that repeat (similar to bar repetition logic)
         rhythm_tuples = [tuple([note[1] for note in bar]) for bar in musical_score]
         rhythm_counts = Counter(rhythm_tuples)
         if len(rhythm_counts) > 0:
-            most_common_rhythm_count = max(rhythm_counts.values())
-            repetition_rhythm_score = most_common_rhythm_count / len(rhythm_tuples)
+            repeated_rhythms = sum(1 for c in rhythm_counts.values() if c > 1)
+            rhythm_repetition_ratio = repeated_rhythms / len(rhythm_counts) if len(rhythm_counts) > 0 else 0
+            repetition_rhythm_score = rhythm_repetition_ratio ** 0.5
         else:
             repetition_rhythm_score = 0.0
 
@@ -517,7 +518,7 @@ class RLMusicBotEnv(gym.Env):
             0.1 * repetition_norm
         )
 
-        if debug:
+        if self.debug:
             # Get detected chords for display
             detected_chords = [self._detect_chord(bar) for bar in musical_score]
             chords_str = ", ".join([str(c) if c else "None" for c in detected_chords])
