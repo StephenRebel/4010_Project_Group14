@@ -253,16 +253,39 @@ class RLMusicBotEnv(gym.Env):
         chord_scores = {}
 
         # scoring each chord
+        # weights: beat position (strong beats more important), duration (longer notes are more important)
         for chord_name, chord_pitches in self.chords.items():
-            score = sum(1 for p in pitches if p in chord_pitches)  # simple count of tones in chord
-            chord_scores[chord_name] = score  # store the score
+            score = 0.0  # score for this chord
+            curr_beat = 0.0  # track beat position in bar
+            
+            # iterate through the notes in the bar
+            for (pitch, duration, volume) in bar_notes:
+                if pitch is not None and pitch in chord_pitches: # only consider notes in the chord
+                    # weighting: strong beats (1 and 3) = 2.0, weak beats (2 and 4) = 1.0
+                    beat_position = curr_beat % self.beats_per_bar  # position within the bar
+                    is_strong_beat = (beat_position < 0.01) or (abs(beat_position - 2.0) < 0.01)  # check for beat 1 or 3
+                    beat_weight = 2.0 if is_strong_beat else 1.0  # strong beats get higher weight
+                    
+                    # dueation weighting so longer notes matter more
+                    duration_weight = duration / 1.0  # normalize by quarter note
+                    
+                    score += beat_weight * duration_weight  # increment the score
+                
+                curr_beat += duration  # moving to next beat position
+            
+            chord_scores[chord_name] = score  # storing the  score for this chord
         
         # just in case no chord matches
         max_score = max(chord_scores.values())
 
         # if no chord has any score, return None
         if max_score == 0:
-            return None
+            return None  # no chord detected
+        
+        # tonic C chord if close in score
+        tonic_threshold = max_score * 0.7  # 70% of max score
+        if 'C' in chord_scores and chord_scores['C'] >= tonic_threshold:  # prefer tonic
+            return 'C' # return C chord if close enough
         
         # return the chord with highest score
         return max(chord_scores, key=chord_scores.get)
