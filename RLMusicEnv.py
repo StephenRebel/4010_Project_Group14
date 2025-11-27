@@ -351,9 +351,14 @@ class RLMusicBotEnv(gym.Env):
         harmony_score = 0.0  # final normalized score (computed later)
         total_notes = 0      # melodic notes counted that are not rests
         chord_tone_hits = 0  # number of notes that are chord tones in their bar
-        transition_hits = 0  # number of notes that also belong to the next bar's chord (smooth voice-leading)
         passing_ncts = 0     # number of passing non-chord tones
         neighbor_ncts = 0    # number of neighbor non-chord tones
+        escape_ncts = 0      # number of escape tones
+        appoggiatura_ncts = 0  # number of appoggiaturas
+        anticipation_ncts = 0  # number of anticipations
+        suspension_ncts = 0  # number of suspensions
+        retardation_ncts = 0  # number of retardations
+        pedal_ncts = 0  # number of pedal tones
 
         # Precompute chord for each bar and build melodic sequence for context
         bar_chords = [self._detect_chord(bar) for bar in musical_score]
@@ -383,16 +388,17 @@ class RLMusicBotEnv(gym.Env):
                 # Chord tone: strong boost
                 if pitch in chord_pitches:
                     chord_tone_hits += 1
-                # Smooth transition: if pitch also fits next chord
-                if next_chord_pitches and pitch in next_chord_pitches:
-                    transition_hits += 1
+                # Anticipation: note belongs to next bar's chord but NOT current bar's chord (NCT)
+                elif next_chord_pitches and pitch in next_chord_pitches:
+                    anticipation_ncts += 1
 
         # Diatonic Non-Chord Tone (NCT) detection and reward 
         # Rules:
         # - Note is NOT a chord tone for its bar
         # - Passing: prev < curr < next or prev > curr > next
         # - Neighbor: prev == next and |curr - prev| == 1 step in self.pitches
-        nct_bonus = 0.0  # accumulated bonus value (0.5 per passing/neighbor tone)
+        # - Escape: step in one direction, leap (2+ steps) in opposite direction
+        nct_bonus = 0.0  # accumulated bonus value (0.5 per passing/neighbor/escape tone)
         for i, (pitch, bar_idx) in enumerate(melodic_notes):
             chord_name = bar_chords[bar_idx]
             if chord_name is None:
@@ -426,12 +432,103 @@ class RLMusicBotEnv(gym.Env):
                     neighbor_ncts += 1
                     continue
 
+            # Escape tone check: step in one direction, leap (2+ steps) in opposite direction
+            if prev_pitch is not None and next_pitch is not None:
+                try:
+                    idx_prev = self.pitches.index(prev_pitch)
+                    idx_curr = self.pitches.index(pitch)
+                    idx_next = self.pitches.index(next_pitch)
+                except ValueError:
+                    continue
+                # Check if current moves by step from prev (1 step)
+                step_from_prev = idx_curr - idx_prev
+                # Check if next moves by leap from current (2+ steps) in opposite direction
+                leap_to_next = idx_next - idx_curr
+                if abs(step_from_prev) == 1 and abs(leap_to_next) >= 2:
+                    # Opposite directions: signs must be different
+                    if (step_from_prev > 0 and leap_to_next < 0) or (step_from_prev < 0 and leap_to_next > 0):
+                        nct_bonus += 0.5
+                        escape_ncts += 1
+                        continue
+
+            # Appoggiatura check: leap (2+ steps) to NCT, then step (1 step) away in opposite direction
+            if prev_pitch is not None and next_pitch is not None:
+                try:
+                    idx_prev = self.pitches.index(prev_pitch)
+                    idx_curr = self.pitches.index(pitch)
+                    idx_next = self.pitches.index(next_pitch)
+                except ValueError:
+                    continue
+                # Leap from prev to current (2+ steps)
+                leap_from_prev = idx_curr - idx_prev
+                # Step from current to next (1 step) in opposite direction
+                step_to_next = idx_next - idx_curr
+                if abs(leap_from_prev) >= 2 and abs(step_to_next) == 1:
+                    # Opposite directions: signs must be different
+                    if (leap_from_prev > 0 and step_to_next < 0) or (leap_from_prev < 0 and step_to_next > 0):
+                        nct_bonus += 0.5
+                        appoggiatura_ncts += 1
+                        continue
+
+            # Suspension check: note held from previous bar's chord, not in current chord, resolves down by step
+            if bar_idx > 0 and prev_pitch is not None and next_pitch is not None:
+                prev_bar_chord = bar_chords[bar_idx - 1]
+                if prev_bar_chord:
+                    prev_bar_chord_pitches = self.chords[prev_bar_chord]
+                    # Check if current pitch belongs to previous bar's chord
+                    if pitch in prev_bar_chord_pitches:
+                        # Check if it resolves down by step
+                        try:
+                            idx_curr = self.pitches.index(pitch)
+                            idx_next = self.pitches.index(next_pitch)
+                        except ValueError:
+                            continue
+                        step_to_next = idx_next - idx_curr
+                        # Suspension resolves downward by step (step_to_next == -1)
+                        if step_to_next == -1:
+                            nct_bonus += 0.5
+                            suspension_ncts += 1
+                            continue
+                        # Retardation resolves upward by step (step_to_next == +1)
+                        if step_to_next == 1:
+                            nct_bonus += 0.5
+                            retardation_ncts += 1
+                            continue
+
+            # Pedal tone check: repeated pitch (prev == curr) that doesn't fit current chord
+            # but was likely a chord tone in a different harmonic context
+            if prev_pitch is not None and prev_pitch == pitch:
+                # It's a repeated note - check if it fits any nearby chord context
+                # If it doesn't fit current bar but does fit prev or next bar, it's acting as a pedal
+                fits_prev_bar = False
+                if bar_idx > 0:
+                    prev_bar_chord = bar_chords[bar_idx - 1]
+                    if prev_bar_chord:
+                        fits_prev_bar = pitch in self.chords[prev_bar_chord]
+                
+                fits_next_bar = False
+                if bar_idx + 1 < len(bar_chords):
+                    next_bar_chord = bar_chords[bar_idx + 1]
+                    if next_bar_chord:
+                        fits_next_bar = pitch in self.chords[next_bar_chord]
+                
+                # Pedal tone: repeated note that fit a different chord context
+                if fits_prev_bar or fits_next_bar:
+                    nct_bonus += 0.5
+                    pedal_ncts += 1
+                    continue
+
         # Compute raw harmony points from counters (mirror previous additive logic)
         raw_harmony_points = (
             chord_tone_hits * 2.0 +
-            transition_hits * 0.5 +
             passing_ncts * 0.5 +
-            neighbor_ncts * 0.5
+            neighbor_ncts * 0.5 +
+            escape_ncts * 0.5 +
+            appoggiatura_ncts * 0.5 +
+            anticipation_ncts * 0.5 +
+            suspension_ncts * 0.5 +
+            retardation_ncts * 0.5 +
+            pedal_ncts * 0.5
         )
         per_note_average = (raw_harmony_points / total_notes) if total_notes > 0 else 0.0
         # Normalize to [0, 1] given a perfect per-note value would be 2.5
@@ -540,9 +637,14 @@ class RLMusicBotEnv(gym.Env):
             print(f"  Harmony:     {harmony_norm:.4f}")
             print(f"    - Total melodic notes:   {total_notes}")
             print(f"    - Chord tones:           {chord_tone_hits} (x2.0 = {chord_tone_hits * 2.0:.1f})")
-            print(f"    - Smooth transitions:    {transition_hits} (x0.5 = {transition_hits * 0.5:.1f})")
             print(f"    - Passing NCTs:          {passing_ncts} (x0.5 = {passing_ncts * 0.5:.1f})")
             print(f"    - Neighbor NCTs:         {neighbor_ncts} (x0.5 = {neighbor_ncts * 0.5:.1f})")
+            print(f"    - Escape NCTs:           {escape_ncts} (x0.5 = {escape_ncts * 0.5:.1f})")
+            print(f"    - Appoggiatura NCTs:     {appoggiatura_ncts} (x0.5 = {appoggiatura_ncts * 0.5:.1f})")
+            print(f"    - Anticipation NCTs:     {anticipation_ncts} (x0.5 = {anticipation_ncts * 0.5:.1f})")
+            print(f"    - Suspension NCTs:       {suspension_ncts} (x0.5 = {suspension_ncts * 0.5:.1f})")
+            print(f"    - Retardation NCTs:      {retardation_ncts} (x0.5 = {retardation_ncts * 0.5:.1f})")
+            print(f"    - Pedal Tone NCTs:       {pedal_ncts} (x0.5 = {pedal_ncts * 0.5:.1f})")
             print(f"    - Raw harmony points:    {raw_harmony_points:.2f}")
             print(f"    - Per-note average:      {per_note_average:.4f}")
             print(f"    - Normalized (/2.5):     {harmony_norm:.4f}")
