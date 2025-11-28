@@ -12,7 +12,7 @@ venv_sb3/
 __pycache__/
 
 # Ignore dataset
-.baselines/nottingham_midi/
+baselines/nottingham_midi/
 
 #For mac
 .DS_Store
