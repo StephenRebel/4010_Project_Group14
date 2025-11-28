@@ -25,15 +25,22 @@ class RLMusicBotEnv(gym.Env):
         self.volumes = [0.4, 0.6, 0.8, 1.0]
         self.n_volumes = len(self.volumes)
         
-        # C maj Chord definitions
+        # C maj Chord definitions (triads + sevenths)
         self.chords = {
-            'C':    [60, 64, 67, 72, 76, 79, 84],   # C E G (C4-C6)
-            'Dm':   [62, 65, 69, 74, 77, 81],       # D F A
-            'Em':   [64, 67, 71, 76, 79, 83],       # E G B
-            'F':    [65, 69, 72, 77, 81, 84],       # F A C
-            'G':    [67, 71, 74, 79, 83],           # G B D
-            'Am':   [69, 72, 76, 81, 84],           # A C E
-            'Bdim': [71, 74, 77, 83],               # B D F
+            'C':      [60, 64, 67, 72, 76, 79, 84],         # C E G (C4-C6)
+            'Cmaj7':  [60, 64, 67, 71, 72, 76, 79, 83, 84], # C E G + B
+            'Dm':     [62, 65, 69, 74, 77, 81],             # D F A
+            'Dm7':    [62, 65, 69, 72, 74, 77, 81, 84],     # D F A + C
+            'Em':     [64, 67, 71, 76, 79, 83],             # E G B
+            'Em7':    [64, 67, 71, 74, 76, 79, 83],         # E G B + D
+            'F':      [65, 69, 72, 77, 81, 84],             # F A C
+            'Fmaj7':  [65, 69, 72, 76, 77, 81, 84],         # F A C + E
+            'G':      [67, 71, 74, 79, 83],                 # G B D
+            'G7':     [65, 67, 71, 74, 77, 79, 83],         # G B D + F
+            'Am':     [69, 72, 76, 81, 84],                 # A C E
+            'Am7':    [67, 69, 72, 76, 79, 81, 84],         # A C E + G
+            'Bdim':   [71, 74, 77, 83],                     # B D F
+            'Bø7':    [69, 71, 74, 77, 81, 83],             # B D F + A (half-diminished)
         }
 
         # Chord progressions weights
@@ -254,6 +261,36 @@ class RLMusicBotEnv(gym.Env):
 
         # scoring each chord
         # weights: beat position (strong beats more important), duration (longer notes are more important)
+        # Map of explicit seventh tones per 7th chord (MIDI values across available octaves)
+        seventh_tones = {
+            'Cmaj7': {71, 83},
+            'Dm7':   {72, 84},
+            'Em7':   {74},
+            'Fmaj7': {76},
+            'G7':    {65, 77},
+            'Am7':   {67, 79},
+            'Bø7':   {69, 81},
+        }
+
+        # Chord roots for cadence bias
+        # Include chord roots across C4–C6 range (60–84)
+        chord_roots = {
+            'C': {60, 72, 84},
+            'Cmaj7': {60, 72, 84},
+            'Dm': {62, 74},
+            'Dm7': {62, 74},
+            'Em': {64, 76},
+            'Em7': {64, 76},
+            'F': {65, 77},
+            'Fmaj7': {65, 77},
+            'G': {67, 79},
+            'G7': {67, 79},
+            'Am': {69, 81},
+            'Am7': {69, 81},
+            'Bdim': {71, 83},
+            'Bø7': {71, 83},
+        }
+
         for chord_name, chord_pitches in self.chords.items():
             score = 0.0  # score for this chord
             curr_beat = 0.0  # track beat position in bar
@@ -273,6 +310,56 @@ class RLMusicBotEnv(gym.Env):
                 
                 curr_beat += duration  # moving to next beat position
             
+            # If evaluating a seventh chord, require its seventh tone presence; otherwise downweight
+            if chord_name in seventh_tones:
+                has_seventh = any(p in seventh_tones[chord_name] for p in pitches)
+                if not has_seventh:
+                    score *= 0.4  # downweight seventh chords when the 7th isn't present in melody
+
+            # Downweight Am7 if there is no C present in the bar (functional check)
+            if chord_name == 'Am7':
+                if not any(p in (72, 84) for p in pitches):  # C across octaves
+                    score *= 0.6
+
+            # Heuristic: avoid classifying Em from lone E; require G or B presence
+            if chord_name == 'Em':
+                has_g_or_b = any(p in (67, 71, 79, 83) for p in pitches)
+                if not has_g_or_b:
+                    score *= 0.5
+
+            # Heuristic: for G/G7, prefer presence of G or D; if only B present, downweight
+            if chord_name in ('G', 'G7'):
+                has_g_or_d = any(p in (67, 79, 74) for p in pitches)
+                if not has_g_or_d:
+                    score *= 0.6
+                else:
+                    # Boost when G is present (dominant function)
+                    has_g = any(p in (67, 79) for p in pitches)
+                    if has_g:
+                        score += 1.5
+                # Extra boost for true dominant when both B and F (tritone) appear
+                has_b = any(p in (71, 83) for p in pitches)
+                has_f = any(p in (65, 77) for p in pitches)
+                if chord_name == 'G7' and (has_b and has_f):
+                    score += 1.2
+
+            # Cadence/root emphasis: boost chords whose root matches the final melodic pitch
+            if pitches:
+                last_pitch = pitches[-1]
+                roots = chord_roots.get(chord_name, set())
+                if last_pitch in roots:
+                    score += 2.0
+
+            # Functional IV emphasis: light boost only when clear triad support present
+            if chord_name in ('F', 'Fmaj7'):
+                has_f = any(p in (65, 77) for p in pitches)
+                if has_f:
+                    has_a = any(p in (69, 81) for p in pitches)
+                    has_c = any(p in (60, 72, 84) for p in pitches)
+                    # Require at least one of A or C alongside F; smaller boost to avoid false positives
+                    if has_a or has_c:
+                        score += 1.0 if has_a and has_c else 0.4
+
             chord_scores[chord_name] = score  # storing the  score for this chord
         
         # just in case no chord matches
@@ -282,13 +369,55 @@ class RLMusicBotEnv(gym.Env):
         if max_score == 0:
             return None  # no chord detected
         
+        # Special handling to prefer C chord in simple melodies
+        c_score = chord_scores.get('C', 0.0)
+        
+        # Check for strong V (G7) evidence before tonic preference
+        # Functional rules for dominant harmony:
+        has_g = any(p in (67, 79) for p in pitches)
+        has_d = any(p in (62, 74) for p in pitches)
+        g7_score = chord_scores.get('G7', 0.0)
+        last_pitch = pitches[-1] if pitches else None
+        
+        # Pattern: D-D-C suggests G7 (D is 5th, C is suspended 4th resolving)
+        d_count = sum(1 for p in pitches if p in (62, 74))
+        if has_d and d_count >= 2 and last_pitch in (60, 72, 84):
+            return 'G7'
+        
+        # If bar emphasizes G or D, prefer G7
+        if has_g and g7_score > c_score:
+            return 'G7'
+        
         # tonic C chord if close in score
-        tonic_threshold = max_score * 0.7  # 70% of max score
+        tonic_threshold = max_score * 0.7  # prefer tonic in simple melodies
         if 'C' in chord_scores and chord_scores['C'] >= tonic_threshold:  # prefer tonic
             return 'C' # return C chord if close enough
+
+        # Prefer dominant G/G7 over Am7 when scores are close (functional harmony bias)
+        if 'Am7' in chord_scores:
+            dom_score = max(chord_scores.get('G', 0.0), chord_scores.get('G7', 0.0))
+            if chord_scores['Am7'] >= tonic_threshold and dom_score >= max_score * 0.6:
+                # Choose G7 if seventh (F) present; else G
+                has_f = any(p in (65, 77) for p in pitches)
+                return 'G7' if has_f else 'G'
         
-        # return the chord with highest score
-        return max(chord_scores, key=chord_scores.get)
+        # return the chord with highest score, with a safeguard to prefer C over Em when close
+        best = max(chord_scores, key=chord_scores.get)
+        # If Em wins narrowly over C, prefer tonic C (nursery melody bias)
+        if best == 'Em' and 'C' in chord_scores:
+            if chord_scores['C'] >= 0.8 * chord_scores['Em']:
+                return 'C'
+        # Prevent false F classification when no A present and C close in score
+        if best in ('F', 'Fmaj7'):
+            has_a = any(p in (69, 81) for p in pitches)
+            has_c = any(p in (60, 72, 84) for p in pitches)
+            if not has_a and has_c and 'C' in chord_scores:
+                if chord_scores['C'] >= 0.6 * chord_scores[best]:
+                    return 'C'
+        # For simple nursery harmonization, label dominant as G7
+        if best == 'G':
+            return 'G7'
+        return best
 
     # Function to compute the reward for the current state of the environment
     # Combination of scale adherence, repetition, and rhythm.    

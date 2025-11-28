@@ -16,6 +16,7 @@ twinkle_twinkle_score = [
     [(65, 1.0, 0.8), (65, 1.0, 0.8), (64, 1.0, 0.8), (64, 1.0, 0.8)],  # Bar 7: F F E E (repeat of Bar 3)
     [(62, 1.0, 0.8), (62, 1.0, 0.8), (60, 2.0, 0.8)]                     # Bar 8: D D C (repeat of Bar 4)
 ]
+# Chord progression should be: [C -> G7 -> C -> G7 -> C -> G7 -> C -> G7]
 
 # Itsy Bitsy Spider is C Major with rests for testing
 itsy_bitsy_spider_score = [
@@ -28,6 +29,7 @@ itsy_bitsy_spider_score = [
     [(62, 0.5, 0.8), (60, 0.5, 0.8), (60, 1.0, 0.8), (None, 1.0, 0.8), (67, 1.0, 0.8)],                # Bar 7: D C C [rest] G (out came the)
     [(67, 0.5, 0.8), (65, 0.5, 0.8), (64, 0.5, 0.8), (62, 0.5, 0.8), (60, 2.0, 0.8)]                    # Bar 8: G F E D C (sun and dried up)
 ]
+# Chord progression should be: [C → F → C → G7 → C → G7 → C → G7 → C]
 
 reward_twinkle = env._compute_reward(musical_score=twinkle_twinkle_score)
 print("Reward for Twinkle Twinkle:", reward_twinkle)
