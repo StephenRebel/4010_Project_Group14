@@ -695,8 +695,8 @@ class RLMusicBotEnv(gym.Env):
             pedal_ncts * 0.5
         )
         per_note_average = (raw_harmony_points / total_notes) if total_notes > 0 else 0.0
-        # Normalize to [0, 1] given a perfect per-note value would be 2.5
-        harmony_score = per_note_average / 2.5
+        # Normalize to [0, 1] given a perfect per-note value would be 2.0
+        harmony_score = per_note_average / 2.0
 
         # Chord progression reward
         bar_chords = [self._detect_chord(bar) for bar in musical_score]
