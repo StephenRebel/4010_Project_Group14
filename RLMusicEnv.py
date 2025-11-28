@@ -814,7 +814,7 @@ class RLMusicBotEnv(gym.Env):
             print(f"    - Pedal Tone NCTs:       {pedal_ncts} (x0.5 = {pedal_ncts * 0.5:.1f})")
             print(f"    - Raw harmony points:    {raw_harmony_points:.2f}")
             print(f"    - Per-note average:      {per_note_average:.4f}")
-            print(f"    - Normalized (/2.5):     {harmony_norm:.4f}")
+            print(f"    - Normalized (/2.0):     {harmony_norm:.4f}")
             # Progression section
             print(f"  Progression: {progression_norm:.4f}")
             print(f"    - Chords detected:       [{chords_str}]")
