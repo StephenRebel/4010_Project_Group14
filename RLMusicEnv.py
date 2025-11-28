@@ -43,7 +43,19 @@ class RLMusicBotEnv(gym.Env):
             'Bø7':    [69, 71, 74, 77, 81, 83],             # B D F + A (half-diminished)
         }
 
-        # Chord progressions weights
+        # Map chords to their functional root (strip 7th/quality variations)
+        self.chord_root_map = {
+            'C': 'C', 'Cmaj7': 'C',
+            'Dm': 'Dm', 'Dm7': 'Dm',
+            'Em': 'Em', 'Em7': 'Em',
+            'F': 'F', 'Fmaj7': 'F',
+            'G': 'G', 'G7': 'G',
+            'Am': 'Am', 'Am7': 'Am',
+            'Bdim': 'Bdim', 'Bø7': 'Bdim',
+        }
+
+        # Chord progressions weights (by functional root)
+        # This table applies to both triads and sevenths (e.g., C/Cmaj7, G/G7)
         self.progression_weights = {
             # --- C progressions ---
             ('C', 'C'): 0.3,        # repetition (neutral)
@@ -698,7 +710,10 @@ class RLMusicBotEnv(gym.Env):
             if prev_chord is None or next_chord is None:
                 continue
             valid_transitions += 1
-            weight = self.progression_weights.get((prev_chord, next_chord), 0.1)
+            # Map to functional roots (C/Cmaj7 → C, G/G7 → G, etc.)
+            prev_root = self.chord_root_map.get(prev_chord, prev_chord)
+            next_root = self.chord_root_map.get(next_chord, next_chord)
+            weight = self.progression_weights.get((prev_root, next_root), 0.1)
             progression_score += weight
 
         # NOTE Already normalized if the one weight 9.0  was a mistake and it was meant to 1.0, other wise come back
@@ -802,14 +817,16 @@ class RLMusicBotEnv(gym.Env):
             print(f"    - Normalized (/2.5):     {harmony_norm:.4f}")
             # Progression section
             print(f"  Progression: {progression_norm:.4f}")
-            print(f"    - Chords: [{chords_str}]")
+            print(f"    - Chords detected:       [{chords_str}]")
             # Chord progression transitions
             for i in range(len(detected_chords) - 1):
                 c1 = detected_chords[i]
                 c2 = detected_chords[i + 1]
                 if c1 is not None and c2 is not None:
-                    weight = self.progression_weights.get((c1, c2), 0.1)
-                    print(f"    - Chord {i+1}->{i+2}: {c1}->{c2} ({weight:.1f})")
+                    root1 = self.chord_root_map.get(c1, c1)
+                    root2 = self.chord_root_map.get(c2, c2)
+                    weight = self.progression_weights.get((root1, root2), 0.1)
+                    print(f"    - Transition {i+1:4d}->{i+2:1d}:    {c1} -> {c2} (weight: {weight:.1f})")
             # Repetition breakdown
             print(f"  Repetition:  {repetition_norm:.4f}")
             print(f"    - Motif:   {repetition_motif_score:.4f}")
