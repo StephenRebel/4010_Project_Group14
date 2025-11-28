@@ -58,7 +58,7 @@ def test_ngram(env, full_test=False):
         avg_reward, breakdown = env._compute_reward(music_score)
         print(f"Reward: {avg_reward}\nBreakdown:\n{breakdown}")
 
-        save_score_to_midi("baselines/ngram_generation_sample.mid", music_score)
+        save_score_to_midi("baselines/sample_compositions/ngram_generation_sample_4.mid", music_score)
     else:
         # Avg reward achieved by the ngram model over N_RUNS runs
         print(f"Testing NGRAM over {N_RUNS} sequences...\n")
@@ -112,7 +112,7 @@ def test_lstm(env, full_test=False):
         avg_reward, breakdown = env._compute_reward(music_score)
         print(f"Reward: {avg_reward}\nBreakdown:\n{breakdown}")
 
-        save_score_to_midi("baselines/lstm_generation_sample.mid", music_score)
+        save_score_to_midi("baselines/sample_compositions/lstm_generation_sample_4.mid", music_score)
     else:
         # Avg reward achieved by the ngram model over N_RUNS runs
         print(f"Testing LSTM over {N_RUNS} sequences...\n")
@@ -133,6 +133,6 @@ def test_lstm(env, full_test=False):
 
 if __name__ == "__main__":
 
-    test_ngram(env, full_test=True)
+    test_ngram(env, full_test=False)
 
-    test_lstm(env, full_test=True)
+    test_lstm(env, full_test=False)

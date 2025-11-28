@@ -57,7 +57,10 @@ class LSTMMusicModel(nn.Module):
     def __init__(self, vocab_size, embed_size=128, hidden_size=256, layers=1, dropout=0.3):
         super(LSTMMusicModel, self).__init__()
         self.embed = nn.Embedding(vocab_size, embed_size, padding_idx=PAD)
-        self.lstm = nn.LSTM(embed_size, hidden_size, num_layers=layers, batch_first=True, dropout=dropout)
+        if layers > 1:
+            self.lstm = nn.LSTM(embed_size, hidden_size, num_layers=layers, batch_first=True, dropout=dropout)
+        else:
+            self.lstm = nn.LSTM(embed_size, hidden_size, num_layers=1, batch_first=True)
         self.dropout = nn.Dropout(p=dropout)
         self.fc = nn.Linear(hidden_size, vocab_size)
     

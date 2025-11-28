@@ -3,13 +3,16 @@
 venv_sb3/
 
 # Ignore song output files
-*.mid
+# *.mid
 
 # Ignore code
 *.zip
 
 # Ignore pycache
 __pycache__/
+
+# Ignore dataset
+.baselines/nottingham_midi/
 
 #For mac
 .DS_Store
