@@ -3,7 +3,7 @@
 venv_sb3/
 
 # Ignore song output files
-# *.mid
+*.mid
 
 # Ignore code
 *.zip
