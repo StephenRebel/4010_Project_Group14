@@ -11,17 +11,16 @@ from baselines.baseline_env_utils import actions_to_musical_score, save_score_to
 # Seed if needed
 # SEED = 42
 SEED = None
-N_RUNS = 1000
+N_RUNS = 5000
 
 # Env Parameters
 NUM_BARS = 8
 VOLUME_ID = 2 # volume=0.8
-env = RLMusicBotEnv(bars=NUM_BARS)
 
 # Model Parameters
 NGRAM_SIZE = 3
-VOCAB_SIZE_NGRAM = env.action_space.n
-VOCAB_SIZE_LSTM = env.action_space.n + 1 # +1 for EOS token
+VOCAB_SIZE_NGRAM = 320
+VOCAB_SIZE_LSTM = 321
 
 # Paths
 LSTM_MODEL_PATH = "baselines/models/best_lstm.pth"
@@ -58,7 +57,7 @@ def test_ngram(env, full_test=False):
         avg_reward, breakdown = env._compute_reward(music_score)
         print(f"Reward: {avg_reward}\nBreakdown:\n{breakdown}")
 
-        save_score_to_midi("baselines/sample_compositions/ngram_generation_sample_4.mid", music_score)
+        save_score_to_midi("baselines/sample_compositions/ngram_generation_sample_3.mid", music_score)
     else:
         # Avg reward achieved by the ngram model over N_RUNS runs
         print(f"Testing NGRAM over {N_RUNS} sequences...\n")
@@ -112,7 +111,7 @@ def test_lstm(env, full_test=False):
         avg_reward, breakdown = env._compute_reward(music_score)
         print(f"Reward: {avg_reward}\nBreakdown:\n{breakdown}")
 
-        save_score_to_midi("baselines/sample_compositions/lstm_generation_sample_4.mid", music_score)
+        save_score_to_midi("baselines/sample_compositions/lstm_generation_sample_3.mid", music_score)
     else:
         # Avg reward achieved by the ngram model over N_RUNS runs
         print(f"Testing LSTM over {N_RUNS} sequences...\n")
@@ -132,7 +131,8 @@ def test_lstm(env, full_test=False):
     return avg_reward
 
 if __name__ == "__main__":
+    env = RLMusicBotEnv(bars=NUM_BARS)
 
-    test_ngram(env, full_test=False)
+    test_ngram(env, full_test=True)
 
-    test_lstm(env, full_test=False)
+    test_lstm(env, full_test=True)
