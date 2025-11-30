@@ -16,17 +16,9 @@ Sharav:
     - Added a test to test phrase variation as well as how leaps would be handled by the reward
   - Finally, working with the team on setting up our demo; Curating benchmark tests to showcase rhythm/repetition reward
 
-
-Danial:
- - Made changes to the reward function to try to optimize and improve the training
-  - Changes included added penalties after calculating the final reward
-  - These penalties punish things such as boring ends, abusing long notes, and improving early bar quality
-
-Stephen:
-  - Worked on refining the baseline generation, curated a dataset from the Nottingham MIDI collection
-    - Extracted song with time signatures adhering to environment requirements then ensuring pitches were within
-      the range expected in the environment.
-    - Minor reworks on training scripts for LSTM and Ngram as needed to generate baseline models.
-  - Ran baseline tests achieving average rewards around 0.65 for NGram modelling and 0.68 for LSTM modelling
-  - Created quick demo notebook and recorded demonstration video.
-  - Next will be working on the final report.
+Drax:
+  - NCT Full - harmony reward complete
+  - Chord fit - Hueristicts (fit for random notes)
+  - 7ths - benchmarks added many case samples 
+  - NCT weights adjusted
+  
