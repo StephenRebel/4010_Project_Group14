@@ -17,4 +17,12 @@ Drax:
   - Chord fit - Hueristicts (fit for random notes)
   - 7ths - benchmarks added many case samples 
   - NCT weights adjusted
-  
+
+Saagar:
+  - We found issues lying within the chord detection function 
+    - The problem was that "A A G" was incorrectly detected as Dm, which was due to naive counting, and to solve this, a weighted algorithm was implemented within the function
+    - The algorithm was just beat position x duration 
+    - This algorithm allowed G to dominate with the weight 4.0 
+    - The progression went up from 0.50 to 1.0
+  - There was also an issue with the harmony divisor, which was too strict for certain harmonies
+    - To solve this, we played around with certain divisors to analyze the melodies and found one which gave optimal results and was appropriate for melodies
