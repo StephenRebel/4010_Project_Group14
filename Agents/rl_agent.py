@@ -17,12 +17,12 @@ class RLAgent:
         CallbackFunction.plot_episode_rewards(episode_rewards, label="Model", smooth=20, filename=filename)
         self.save(self.save_path)
 
-    def test(self, render=True, midi_filename=None, debug=False):
+    def test(self, render=True, midi_filename=None, debug=False, deterministic=False):
         obs, _ = self.env.reset()
         done = False
         final_reward = 0
         while not done:
-            action, _ = self.model.predict(obs)
+            action, _ = self.model.predict(obs, deterministic=deterministic)
             obs, reward, done, _, _info = self.env.step(action)
             if render and self.env.render_mode == "human":
                 self.env.render()

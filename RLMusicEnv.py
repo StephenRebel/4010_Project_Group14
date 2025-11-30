@@ -22,8 +22,8 @@ class RLMusicBotEnv(gym.Env):
         self.durations = [0.25, 0.5, 1.0, 2.0, 4.0]
         self.n_durations = len(self.durations)
 
-        self.volumes = [0.4, 0.6, 0.8, 1.0]
-        self.n_volumes = len(self.volumes)
+        # self.volumes = [0.4, 0.6, 0.8, 1.0]
+        # self.n_volumes = len(self.volumes)
         
         # C maj Chord definitions (triads + sevenths)
         self.chords = {
@@ -122,11 +122,11 @@ class RLMusicBotEnv(gym.Env):
         }
 
         # Spaces
-        self.action_space = gym.spaces.Discrete(self.n_pitches * self.n_durations * self.n_volumes)
+        self.action_space = gym.spaces.Discrete(self.n_pitches * self.n_durations)
 
         #Define the observation space
         self.MAX_NOTES_PER_BAR = int(self.beats_per_bar / self.durations[0])
-        obs_shape = (self.bars * self.MAX_NOTES_PER_BAR * 3 + 1,)
+        obs_shape = (self.bars * self.MAX_NOTES_PER_BAR * 2 + 1,)
         self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=obs_shape, dtype=np.float32)
 
 
@@ -146,15 +146,15 @@ class RLMusicBotEnv(gym.Env):
         self.clock = 0.5
 
     def _map_action_to_note(self, action):
-        pitch_idx = action // (self.n_durations * self.n_volumes)
-        duration_idx = (action % (self.n_durations * self.n_volumes)) // self.n_volumes
-        volume_idx = action % self.n_volumes
+        pitch_idx = action // self.n_durations
+        duration_idx = action % self.n_durations
+        # volume_idx = action % self.n_volumes
 
         pitch = None if pitch_idx == self.rest_action else self.pitches[pitch_idx]
         duration = self.durations[duration_idx]
-        volume = self.volumes[volume_idx]
+        # volume = 1
 
-        return (pitch, duration, volume)
+        return (pitch, duration)
 
     def reset(self, seed=None):
         super().reset(seed=seed)
@@ -172,22 +172,22 @@ class RLMusicBotEnv(gym.Env):
     #Get current observation space
     def _get_obs(self):
         # Prepare an empty array for indices
-        obs = np.zeros((self.bars, self.MAX_NOTES_PER_BAR, 3), dtype=np.float32)
+        obs = np.zeros((self.bars, self.MAX_NOTES_PER_BAR, 2), dtype=np.float32)
 
         # Fill in the notes
         for i, bar in enumerate(self._musical_score[:self.bars]):
-            for j, (pitch, duration, volume) in enumerate(bar[:self.MAX_NOTES_PER_BAR]):
+            for j, (pitch, duration) in enumerate(bar[:self.MAX_NOTES_PER_BAR]):
                 # Convert pitch, duration, volume to indices
                 pitch_i = self.pitches.index(pitch) if pitch in self.pitches else self.rest_action
                 duration_i = self.durations.index(duration)
-                volume_i = self.volumes.index(volume)
+                # volume_i = self.volumes.index(volume)
 
                 # Normalize to [0,1]
                 pitch_norm = pitch_i / (self.n_pitches - 1)
                 duration_norm = duration_i / (self.n_durations - 1)
-                volume_norm = volume_i / (self.n_volumes - 1)
+                # volume_norm = volume_i / (self.n_volumes - 1)
 
-                obs[i, j] = [pitch_norm, duration_norm, volume_norm]
+                obs[i, j] = [pitch_norm, duration_norm]
 
         obs = obs.flatten()
 
@@ -207,18 +207,19 @@ class RLMusicBotEnv(gym.Env):
 
         #Get note from action space
         note = self._map_action_to_note(action)
-        pitch, duration, volume = note
+        pitch, duration = note
 
         remaining = self.beats_per_bar - sum([n[1] for n in self._musical_score[self.current_bar]])
 
         #Punish durations longer than allowed
         if duration > remaining:
-            reward = 0
-            obs = self._get_obs()
-            done = False
-            return obs.astype(np.float32), reward, done, False, {}
-        
+            duration = remaining
+            punish = 0.05
+        else:
+            punish = 0.0
+
         self._musical_score[self.current_bar].append(note)
+        duration = note[1]
         self.last_pitch = pitch
         self.last_duration = duration
         
@@ -241,7 +242,7 @@ class RLMusicBotEnv(gym.Env):
         
         #For now reward structure 0 unless at terminal state, i.e. only reward
         if done:
-            reward, reward_info = self._compute_reward(self._musical_score, debug=self.debug)
+            reward, reward_info, _ = self._compute_reward(self._musical_score, debug=self.debug)
         else:
             reward = 0.0
             reward_info = {}
@@ -251,7 +252,7 @@ class RLMusicBotEnv(gym.Env):
         #View obs
         if self.debug:
             print(f"\nStep Observation (bar x note x [pitch,dur,vol]):\n{obs}")
-        return obs.astype(np.float32), reward, done, False, {}
+        return obs.astype(np.float32), reward - punish, done, False, {}
 
     # reward function components
     # essentially we want to reward
@@ -308,7 +309,7 @@ class RLMusicBotEnv(gym.Env):
             curr_beat = 0.0  # track beat position in bar
             
             # iterate through the notes in the bar
-            for (pitch, duration, volume) in bar_notes:
+            for (pitch, duration) in bar_notes:
                 if pitch is not None and pitch in chord_pitches: # only consider notes in the chord
                     # weighting: strong beats (1 and 3) = 2.0, weak beats (2 and 4) = 1.0
                     beat_position = curr_beat % self.beats_per_bar  # position within the bar
@@ -434,7 +435,7 @@ class RLMusicBotEnv(gym.Env):
     # Function to compute the reward for the current state of the environment
     # Combination of scale adherence, repetition, and rhythm.    
     def _compute_reward(self, musical_score, debug=False):
-        # Rhythm reward section, may have to look at datasets of MIDI for some of these parameters
+        # RHYTHM REWARD
         subdivisions = 4 # allowing 16th notes above
         min_note_duration = 0.25
 
@@ -444,7 +445,7 @@ class RLMusicBotEnv(gym.Env):
         min_expected_notes_bar = 1.0 # Number of notes we expect to see in a typical bar.
         
         max_entropy = np.log(subdivisions)
-        target_entropy = 0.7 * max_entropy # Variety of note placement in bar
+        target_entropy = 1.15 * max_entropy # Variety of note placement in bar
 
         notes_played = [] # List of when notes are played
         notes_per_bar = []
@@ -452,7 +453,7 @@ class RLMusicBotEnv(gym.Env):
         current_sub = 0
         for bar in musical_score:
             count_in_bar = 0
-            for (pitch, duration, volume) in bar:
+            for (pitch, duration) in bar:
                 sub_divs_note = int(duration * subdivisions)
                 if pitch is not None:
                     notes_played.append(current_sub)
@@ -509,7 +510,7 @@ class RLMusicBotEnv(gym.Env):
 
         rhythm_score = float(np.dot(scores, weights)) / np.sum(weights) # normalized 0 to 1
 
-        # Harmony reward
+        # HARMONY REWARD
         # Compute per-note harmony contributions and detect Diatonic Non-Chord Tones
         # We'll track granular components for debug breakdown.
         harmony_score = 0.0  # final normalized score (computed later)
@@ -531,7 +532,7 @@ class RLMusicBotEnv(gym.Env):
         for bar_idx, bar in enumerate(musical_score):
             chord_name = bar_chords[bar_idx]
             # collect melodic notes regardless of chord detection so sequence is continuous
-            for (pitch, duration, volume) in bar:
+            for (pitch, duration) in bar:
                 if pitch is not None:
                     melodic_notes.append((pitch, bar_idx))
 
@@ -545,7 +546,7 @@ class RLMusicBotEnv(gym.Env):
                 if next_chord:
                     next_chord_pitches = self.chords[next_chord]
 
-            for (pitch, duration, volume) in bar:
+            for (pitch, duration) in bar:
                 if pitch is None:
                     continue
                 total_notes += 1
@@ -697,7 +698,7 @@ class RLMusicBotEnv(gym.Env):
         # Normalize to [0, 1] given a perfect per-note value would be 1.7 (sweet spot between 1.5 and 2.0)
         harmony_score = per_note_average / 1.7
 
-        # Chord progression reward
+        # PROGRESSION REWARD
         bar_chords = [self._detect_chord(bar) for bar in musical_score]
 
         progression_score = 0.0
@@ -719,67 +720,237 @@ class RLMusicBotEnv(gym.Env):
         if valid_transitions > 0:
             progression_score /= valid_transitions
 
-        # Repetition reward
-        # 1. Motif repetition (melodic n-grams including rests)
+        # REPETITION REWARD
         sequence = []
         for bar in musical_score:
-            for (pitch, duration, volume) in bar:
-                # Include rests (None) to recognize rest patterns in motifs
-                sequence.append(pitch)
+            for (pitch, duration) in bar:
+                sequence.append((pitch, duration))
 
         repetition_motif_score = 0.0
-        if len(sequence) >= 2:
+        motif_variety_bonus = 0.0
+
+        if len(sequence) >= 3:
             total_weight = 0.0
-            for n, weight in [(1, 0.3), (2, 0.4), (3, 0.3)]:
-                if len(sequence) < n:
+            
+            # Track unique motifs vs total for variety
+            all_motifs_seen = set()
+            repeated_motifs = set()
+            
+            for n, weight in [(2, 0.20), (3, 0.45), (4, 0.30)]:
+                if len(sequence) < n + 1:
                     continue
                 ngrams = [tuple(sequence[i:i+n]) for i in range(len(sequence) - n + 1)]
-                if len(ngrams) == 0:
-                    continue
                 counts = Counter(ngrams)
-                repeated = sum(1 for c in counts.values() if c > 1)
-                repetition_ratio = repeated / len(counts) if len(counts) > 0 else 0
-                score_n = repetition_ratio ** 0.5
+                
+                # Track motifs
+                all_motifs_seen.update(ngrams)
+                repeated_motifs.update([m for m, c in counts.items() if c > 1])
+                
+                # Reward meaningful repetition (2-3 times), penalize excessive (4+)
+                meaningful_reps = sum(min(c - 1, 2) for c in counts.values() if 1 < c <= 3)
+                excessive_reps = sum(max(c - 3, 0) for c in counts.values() if c > 3)
+                
+                max_meaningful = len(ngrams)
+                score_n = (meaningful_reps - excessive_reps * 0.5) / max(max_meaningful, 1)
+                score_n = max(0.0, min(score_n, 1.0))
+                
                 repetition_motif_score += weight * score_n
                 total_weight += weight
+            
             if total_weight > 0:
                 repetition_motif_score /= total_weight
-        else:
-            repetition_motif_score = 0.0
+            
+            # Bonus for having repeated motifs (shows structure)
+            if len(all_motifs_seen) > 0:
+                repetition_ratio = len(repeated_motifs) / len(all_motifs_seen)
+                motif_variety_bonus = min(repetition_ratio * 0.3, 0.2)
+            
+            repetition_motif_score = min(repetition_motif_score + motif_variety_bonus, 0.75)
 
-        # 2. Bar repetition (identical bars)
-        bar_tuples = [tuple(bar) for bar in musical_score]
-        bar_counts = Counter(bar_tuples)
-        repeated_bars = sum(1 for c in bar_counts.values() if c > 1)
-        bar_repetition_ratio = repeated_bars / len(bar_counts) if len(bar_counts) > 0 else 0
-        repetition_bar_score = bar_repetition_ratio ** 0.5
+            # Novelty bonus
+            ngram_sizes = [2, 3, 4]  # lengths of motifs to consider for novelty
+            novelty_score = 0.0
 
-        # 3. Rhythm repetition: proportion of rhythm patterns that repeat (similar to bar repetition logic)
-        rhythm_tuples = [tuple([note[1] for note in bar]) for bar in musical_score]
-        rhythm_counts = Counter(rhythm_tuples)
-        if len(rhythm_counts) > 0:
-            repeated_rhythms = sum(1 for c in rhythm_counts.values() if c > 1)
-            rhythm_repetition_ratio = repeated_rhythms / len(rhythm_counts) if len(rhythm_counts) > 0 else 0
-            repetition_rhythm_score = rhythm_repetition_ratio ** 0.5
-        else:
-            repetition_rhythm_score = 0.0
-
-        # Combine all repetition components (equal weights)
-        repetition_score = (repetition_motif_score + repetition_bar_score + repetition_rhythm_score) / 3.0
+            for n in ngram_sizes:
+                ngrams = [tuple(sequence[i:i+n]) for i in range(len(sequence) - n + 1)]
+                counts = Counter(ngrams)
+                # Ratio of motifs that appear only once
+                unique_ratio = sum(1 for c in counts.values() if c == 1) / max(len(ngrams), 1)
+                novelty_score += unique_ratio / len(ngram_sizes)  # normalize to 0-1
+            repetition_motif_score = min(repetition_motif_score + novelty_score * 0.5, 0.75)
 
         # Ensure all scores are are in proper range by clamping, should already be [0.0, 1.0] but failsafe
         rhythm_norm = float(np.clip(rhythm_score, 0.0, 1.0))
         harmony_norm = float(np.clip(harmony_score, 0.0, 1.0))
         progression_norm = float(np.clip(progression_score, 0.0, 1.0))
-        repetition_norm = float(np.clip(repetition_score, 0.0, 1.0))
+        repetition_norm = float(np.clip(repetition_motif_score, 0.0, 1.0))
+
+        #POST REWARD COMPUTATIONS
+
+        #BAR MONOTONY AND DURATION VARIETY
+        bar_monotony_penalty = 0.0
+        for bar_idx, bar in enumerate(musical_score):
+            bar_durations = [n[1] for n in bar if n[0] is not None]
+            
+            if len(bar_durations) > 1:
+                # Check if all notes in bar have same duration
+                if len(set(bar_durations)) == 1:
+                    # All notes same duration in this bar
+                    if bar_durations[0] >= 2.0:
+                        # All long notes in one bar
+                        bar_monotony_penalty += 0.15
+                    elif bar_durations[0] == 1.0 and len(bar_durations) == 4:
+                        # Four quarter notes in a row (too mechanical)
+                        bar_monotony_penalty += 0.08
+                
+                # Check for excessive same duration (>75% of bar)
+                dur_counter = Counter(bar_durations)
+                if dur_counter:
+                    most_common_dur, count = dur_counter.most_common(1)[0]
+                    if count / len(bar_durations) > 0.75 and most_common_dur >= 1.0:
+                        bar_monotony_penalty += 0.10
+
+        durations_used = [d for bar in musical_score for _, d in bar]
+        if durations_used:
+            dur_counter = Counter(durations_used)
+            dur_probs = np.array(list(dur_counter.values())) / len(durations_used)
+            dur_entropy = -np.sum(dur_probs * np.log(dur_probs + 1e-9))
+            max_dur_entropy = np.log(len(self.durations))  # 5 possible durations
+            duration_variety_score = (dur_entropy / (max_dur_entropy + 1e-9)) * 0.12
+        else:
+            duration_variety_score = 0.0
+
+        # EARLY BAR QUALITY
+        early_bar_penalty = 0.0
+        # Penalize whole notes in first 2 bars heavily
+        for bar_idx in range(min(2, len(musical_score))):
+            bar = musical_score[bar_idx]
+            bar_notes = [n for n in bar if n[0] is not None]
+            
+            if len(bar_notes) == 0:
+                # Empty bar at start
+                early_bar_penalty += 0.40
+            elif len(bar_notes) == 1:
+                # Single note bar (likely whole note)
+                if bar_notes[0][1] >= 4.0:
+                    # Whole note in early bar
+                    early_bar_penalty += 0.35
+                elif bar_notes[0][1] >= 2.0:
+                    # Half note in early bar
+                    early_bar_penalty += 0.20
+            elif len(bar_notes) <= 2:
+                # Very sparse early bar (2 notes or less)
+                avg_duration_early = sum(n[1] for n in bar_notes) / len(bar_notes)
+                if avg_duration_early >= 2.0:
+                    early_bar_penalty += 0.25
+
+        # Reward active first bar
+        first_bar_note_count = len([n for n in musical_score[0] if n[0] is not None])
+        if first_bar_note_count >= 4:
+            early_bar_penalty -= 0.15
+        elif first_bar_note_count >= 3:
+            early_bar_penalty -= 0.08
+
+        # LONG NOTE ABUSE
+        duration_exploit_penalty = 0.0
+        notes = [n for bar in musical_score for n in bar if n[0] is not None]
+        if notes:
+            whole_notes = sum(1 for n in notes if n[1] >= 4.0)
+            whole_note_ratio = whole_notes / len(notes)
+            
+            # Penalize if more than 50% whole notes
+            if whole_note_ratio > 0.50:
+                duration_exploit_penalty += 0.35 * (whole_note_ratio - 0.50)
+            
+            # Extra penalty for very sparse bars (likely whole notes)
+            bars_with_one_note = sum(1 for bar in musical_score if len([n for n in bar if n[0] is not None]) == 1)
+            if bars_with_one_note > len(musical_score) * 0.5:
+                duration_exploit_penalty += 0.25
+
+        consecutive_long = 0
+        max_consecutive = 0
+        for bar in musical_score:
+            for pitch, dur in bar:
+                if dur >= 2.0:
+                    consecutive_long += 1
+                    max_consecutive = max(max_consecutive, consecutive_long)
+                else:
+                    consecutive_long = 0
+
+        if max_consecutive >= 3:
+            duration_exploit_penalty += 0.3 * (max_consecutive - 2)
+
+        #AVG DURATION PENALTY
+        global_duration_penalty = 0.0
+        if notes:
+            durations = [n[1] for n in notes]
+            n_notes = len(durations)
+            avg_dur = sum(durations) / n_notes
+            long_note_ratio = sum(1 for d in durations if d >= 2.0) / n_notes
+            has_very_long = any(d >= 4.0 for d in durations)
+
+            # Heavy penalties only when it's clearly exploiting
+            if avg_dur > 1.8:
+                global_duration_penalty += 0.22
+            if long_note_ratio > 0.65:
+                global_duration_penalty += 0.18
+            if has_very_long and n_notes <= 12:
+                global_duration_penalty += 0.25
+
+        # BAD START/ENDING PENALTY
+
+        # Bad first bar
+        structural_penalty = 0.0
+        first_bar_notes = [n for n in musical_score[0] if n[0] is not None]
+        if len(first_bar_notes) == 0:                      # full bar rest at the start
+            structural_penalty += 0.35
+        elif sum(n[1] for n in musical_score[0]) < 2.0:    # less than a half note in bar 1
+            structural_penalty += 0.18
+
+        # Lazy ending bars
+        ending_penalty = 0.0
+        for bar_idx in range(max(0, len(musical_score) - 2), len(musical_score)):
+            bar = musical_score[bar_idx]
+            bar_notes = [n for n in bar if n[0] is not None]
+            
+            if len(bar_notes) == 1 and bar_notes[0][1] >= 4.0:
+                # Whole note in ending - very bad
+                ending_penalty += 0.40
+            elif len(bar_notes) <= 2 and bar_notes:
+                avg_ending_dur = sum(n[1] for n in bar_notes) / len(bar_notes)
+                if avg_ending_dur >= 2.0:
+                    # Sparse, long-note ending
+                    ending_penalty += 0.25
+
+        structural_penalty += ending_penalty
+
+        # Empty bars mid-piece
+        for i in range(1, len(musical_score)):
+            if all(n[0] is None for n in musical_score[i]):
+                structural_penalty += 0.12
+
+        #FINAL REWARD CALCULATION
 
         # Compute final weight reward score
-        final_reward = (
-            0.27 * rhythm_norm +
-            0.35 * harmony_norm +
-            0.28 * progression_norm +
-            0.1 * repetition_norm
+        base_reward = (
+            0.45 * rhythm_norm +
+            0.22 * harmony_norm +
+            0.18 * progression_norm +
+            0.15 * repetition_norm
         )
+        base_reward = np.clip(base_reward, 0.0, 1.0)
+
+        total_penalty = (
+            duration_variety_score + 
+            bar_monotony_penalty +
+            early_bar_penalty +
+            duration_exploit_penalty +
+            global_duration_penalty +
+            structural_penalty
+        )
+
+        final_reward = base_reward - total_penalty
+        final_reward = np.clip(final_reward, 0.0, 1.0)
 
         if self.debug:
             # Get detected chords for display
@@ -789,7 +960,7 @@ class RLMusicBotEnv(gym.Env):
             print("\n" + "="*60)
             print("REWARD")
             print("="*60)
-            print(f"Overall: {final_reward:.4f}")
+            print(f"Overall: {base_reward:.4f}")
             # Rhythm detailed breakdown
             print(f"  Rhythm:      {rhythm_norm:.4f}")
             print(f"    - Quarter beat ratio:    {quarter_beat_ratio:.4f} (weight: 1.8)")
@@ -828,9 +999,16 @@ class RLMusicBotEnv(gym.Env):
                     print(f"    - Transition {i+1:4d}->{i+2:1d}:    {c1} -> {c2} (weight: {weight:.1f})")
             # Repetition breakdown
             print(f"  Repetition:  {repetition_norm:.4f}")
-            print(f"    - Motif:   {repetition_motif_score:.4f}")
-            print(f"    - Bar:     {repetition_bar_score:.4f}")
-            print(f"    - Rhythm:  {repetition_rhythm_score:.4f}")
+            print(f"    └ Motif repetition score: {repetition_motif_score:.4f}")
+
+            print(f"  Penalties:")
+            print(f"    - Bar monotony penalty:       {bar_monotony_penalty:.4f}")
+            print(f"    - Early bar penalty:          {early_bar_penalty:.4f}")
+            print(f"    - Duration exploit penalty:   {duration_exploit_penalty:.4f}")
+            print(f"    - Global duration penalty:    {global_duration_penalty:.4f}")
+            print(f"    - Structural penalty:         {structural_penalty:.4f}")
+            print(f"    - Duration variety score:     {duration_variety_score:.4f}")
+
             print("="*60 + "\n")
 
         # Return both final reward and breakdown dictionary
@@ -839,7 +1017,7 @@ class RLMusicBotEnv(gym.Env):
             'harmony': harmony_norm,
             'progression': progression_norm,
             'repetition': repetition_norm,
-        }
+        }, base_reward
 
     def _init_live_plot(self):
             plt.ion()
@@ -871,7 +1049,7 @@ class RLMusicBotEnv(gym.Env):
         current_time = 0.0
 
         for bar_notes in self._musical_score:
-            for pitch, duration, volume in bar_notes:
+            for pitch, duration in bar_notes:
                 if pitch is not None:
                     # color = plt.cm.viridis(volume)
                     ax.hlines(pitch, current_time, current_time + duration, colors="black", linewidth=4)
@@ -902,14 +1080,14 @@ class RLMusicBotEnv(gym.Env):
 
         current_time = 0.0
         for bar in self._musical_score:
-            for (pitch, duration, volume) in bar:
+            for (pitch, duration) in bar:
                 if pitch is None:
                     # Rest — skip ahead in time
                     current_time += duration * seconds_per_beat
                     continue
 
                 note = pretty_midi.Note(
-                    velocity=int(volume * 127),
+                    velocity=int(1 * 127),
                     pitch=int(pitch),
                     start=current_time,
                     end=current_time + duration * seconds_per_beat
