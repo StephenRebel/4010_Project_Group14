@@ -15,3 +15,9 @@ Sharav:
     - Added one that was more 'complex' than a nursery rhyme to test harmony, repeated motifs, and long note phrasing all at once
     - Added a test to test phrase variation as well as how leaps would be handled by the reward
   - Finally, working with the team on setting up our demo; Curating benchmark tests to showcase rhythm/repetition reward
+
+
+Danial:
+ - Made changes to the reward function to try to optimize and improve the training
+  - Changes included added penalties after calculating the final reward
+  - These penalties punish things such as boring ends, abusing long notes, and improving early bar quality
