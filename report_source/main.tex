@@ -1,6 +1,9 @@
 \documentclass{article}
 
+
+% Compile preprint version
 \usepackage[preprint]{neurips_2023}
+
 
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
@@ -12,13 +15,20 @@
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}         % colors
 
+
 \title{COMP 4010 - Reinforcement Learning Group 14 Final Project}
 
 
 \author{
-    Us
-    Saagar Gahlot \\
-    % Fill in
+  Saagar Gahlot \\
+  \And
+  Stephen Rebel \\
+  XXXXXXXX \\
+  \texttt{EMAIL_XXXXX} \\
+  \And
+  Danial McIntyre \\
+  XXXXXXXX \\
+  \texttt{EMAIL_XXXXX} \\
 }
 
 
@@ -26,6 +36,7 @@
 
 
 \maketitle
+
 
 \begin{abstract}
   The problem of training a Reinforcement Learning Agent to produce short musical compositions from scratch will be addressed. 
@@ -39,6 +50,21 @@
 
 \section{Introduction}
 
+This project aims to learn a policy from scratch which can generate musical compositions within the constraints of the Gymnasium (Maybe citations) environment we defined.
+We framed the generation as a constrained Markov Decision Process (MDP). The core challenge faced was training purely with Reinforcement Learning (RL) in the absense of any supervised pretraining.
+As such the performance of an agent is heavily dependant on the design and implementation of a strong reward function that provides representative and guiding feedback.
+
+Understanding how an RL agent can learn musicality from interaction with an environment and receiving rewards provides insights into a lesser studied method of artificial music composition.
+Additionally it allows the comparisson of this technique against more well established and traditional mthods such as supervised and unsupervised learning in deep neural networks.
+Exploring the capabilities of RL agents in composing meaningful musical sequences is also transferable to studying the abilities of RL methods for long-term dependency and self-referential problems in real world planning.
+
+Our state space is a musical composition of user defined number of bars (4 to 16 is often a reasonable range) defined as an array of bars. The bars vary in length as the agent generates notes and the internal representation is transformed into a flatten array for observation.
+The action space is the constrained set of notes ranging over 2 octaves of the C major scale from MIDI pitch 60 to 84 in addition to a note lengths of either a sixteenth, eighth, quarter, half, or whole note and rests of corresponding length. There are a total 90 actions.
+Our transition function is a deterministic in that the chosen note is appened (possibly after truncation to the the bar and applying a punishment), and updates the current beat before adding an additional bar to the internal musical score as appropriate. The terminal state is implicitly defined as a full score. Additionally the dynamics are implicit to the model as it only recieves observations and reward in reponse to its actions.
+We provide a sparse reward to our agent (with the exceptions of penalties for invalid notes), computing a mathematical score for the completed musical score. This reward returned upon completion of a musical composition is a combination of rhythmic, harmonic, progression, and repetition properties as will be further dicussed later.
+Due to the nature of musical composition we do not include any discount factor in our MDP formulation.
+
+(Please validate the MDP formulation and provide any other feedback or changes on the intro!)
 
 \section{Approaches}
 
