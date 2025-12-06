@@ -50,19 +50,26 @@
 
 \section{Introduction}
 
-This project aims to learn a policy from scratch which can generate musical compositions within the constraints of the Gymnasium (Maybe citations) environment we defined.
-We framed the generation as a constrained Markov Decision Process (MDP). The core challenge faced was training purely with Reinforcement Learning (RL) in the absense of any supervised pretraining.
-As such the performance of an agent is heavily dependant on the design and implementation of a strong reward function that provides representative and guiding feedback.
+This project focuses on training a Reinforcement Learning (RL) agent to generate musical compositions, of predefined lengths typically 4 to 16 bars, from scratch. Our agent learns purely through trial and error without supervised pre-training as is often used in existing approaches.
+The core challenge lies in creating musically coherent sequences with the reward as the sole guide. Musical quality is reliant upon multiple dimensions, such as rhythm, repetition, melody, harmony, and structural progression. Additionally, music generation differs from standard RL applications because the quality of a composition relies upon the generation of each note and is heavily dependent on its interaction with both previous and subsequent notes. This requires the agent to handle multiple competing objectives simultaneously.
 
-Understanding how an RL agent can learn musicality from interaction with an environment and receiving rewards provides insights into a lesser studied method of artificial music composition.
-Additionally it allows the comparisson of this technique against more well established and traditional mthods such as supervised and unsupervised learning in deep neural networks.
-Exploring the capabilities of RL agents in composing meaningful musical sequences is also transferable to studying the abilities of RL methods for long-term dependency and self-referential problems in real world planning.
+Understanding how an RL agent can learn musicality solely from environmental interaction and reward feedback provides insights into a lesser studied method of artificial music composition.
+It allows for direct comparison of this technique against more well-established traditional methods, such as supervised and unsupervised learning with deep neural networks.
+Exploring the capabilities of RL agents in composing meaningful musical sequences is also transferable to studying RL methods. It allows analyzing long-term dependency and self-referential problems, which are impactful in real-world planning and control systems.
 
-Our state space is a musical composition of user defined number of bars (4 to 16 is often a reasonable range) defined as an array of bars. The bars vary in length as the agent generates notes and the internal representation is transformed into a flatten array for observation.
-The action space is the constrained set of notes ranging over 2 octaves of the C major scale from MIDI pitch 60 to 84 in addition to a note lengths of either a sixteenth, eighth, quarter, half, or whole note and rests of corresponding length. There are a total 90 actions.
-Our transition function is a deterministic in that the chosen note is appened (possibly after truncation to the the bar and applying a punishment), and updates the current beat before adding an additional bar to the internal musical score as appropriate. The terminal state is implicitly defined as a full score. Additionally the dynamics are implicit to the model as it only recieves observations and reward in reponse to its actions.
-We provide a sparse reward to our agent (with the exceptions of penalties for invalid notes), computing a mathematical score for the completed musical score. This reward returned upon completion of a musical composition is a combination of rhythmic, harmonic, progression, and repetition properties as will be further dicussed later.
-Due to the nature of musical composition we do not include any discount factor in our MDP formulation.
+We frame the generation process as a constrained Markov Decision Process (MDP) defined by $(\mathcal{S}, \mathcal{A}, P, R, \gamma)$:
+
+\begin{description}
+  \item[State Space ($\mathcal{S}$):] The state represents the musical composition as it is generated. It is internally represented as a dynamic array of bars. As the agent generates notes, they are appeneded to the current bar. The internal representation is converted to an fixed length array of zeros with the generated notes represented in respective indices. To assist the agent in subsequent note generation the number of beats remaining the the current bar is appended to this flattened observation and both are returned to the agent.
+
+  \item[Action Space ($\mathcal{A}$):] The action space is discrete, consisting of 90 total actions. These represent the constrained set of notes spanning two octaves of the C major scale (MIDI pitch 60 to 84), combined with specific note durations (sixteenth, eighth, quarter, half, or whole) and rests of corresponding lengths.
+
+  \item[Transition Function ($P$):] The state transitions are deterministic. When an action is selected, the chosen note is appended to the internal score. If a selected note duration exceeds the remaining beats of the current bar, it is truncated to the remaining beats and penalized. The current beat counter is updated and bars are added to the internal representation as appropriate. The episode terminates when the score reaches the pre-defined number of bars.
+
+  \item[Reward Function ($R$):] We employ a sparse reward structure. The agent receives immediate negative penalties for invalid actions. The reward for a composition is calculated at the terminal state. It is mathematical evaluation of rhythmic quality, harmonic and melodic structure, progression, and repetition in addition to penalties for violation of the above musical properties.
+
+  \item[Discount Factor ($\gamma$):] Due to the compositional nature of musical composition, we do not discount future rewards, setting $\gamma = 1$.
+\end{description}
 
 (Please validate the MDP formulation and provide any other feedback or changes on the intro!)
 
