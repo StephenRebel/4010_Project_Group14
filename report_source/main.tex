@@ -29,6 +29,10 @@
   Danial McIntyre \\
   XXXXXXXX \\
   \texttt{EMAIL_XXXXX} \\
+  \And
+  Drax Lindgren \\
+  XXXXXXXX \\
+  \texttt{EMAIL_XXXXX} \\
 }
 
 
@@ -77,6 +81,62 @@ We frame the generation process as a constrained Markov Decision Process (MDP) d
 
 \section{Approaches}
 
+We implemented and compared three distinct approaches to musical composition generation: two reinforcement learning methods (Deep Q-Networks and Proximal Policy Optimization) and two baseline methods (N-gram language models and LSTM neural networks). Each approach operates within the same constrained environment but differs fundamentally in its learning strategy.
+
+\subsection{Reinforcement Learning Agents}
+
+Our primary focus lies in training RL agents from scratch to generate musical compositions purely through environmental interaction. We employ the Stable-Baselines3 library~\cite{stable-baselines3} to implement two state-of-the-art RL algorithms.
+
+\subsubsection{Deep Q-Network (DQN)}
+
+DQN is a value-based off-policy algorithm that learns to approximate the action-value function $Q(s, a)$, representing the expected return when taking action $a$ in state $s$ and following the optimal policy thereafter. The algorithm maintains two key components: a replay buffer storing past experiences $(s, a, r, s')$ and a target network to stabilize training. The Q-network is updated by minimizing the temporal difference error.
+
+(insert formula here)
+
+For our music generation task, we configure DQN with a learning rate of $10^{-4}$, replay buffer size of $10^6$, and $\epsilon$-greedy exploration that anneals from 1.0 to 0.05 over 15\% of training. The agent learns through 20,000 episodes of 8-bar composition generation, with experience replay enabling efficient learning from past compositions. The target network updates every 8,000 steps to maintain training stability. This off-policy approach allows the agent to learn from suboptimal compositions while gradually improving its policy.
+
+\subsubsection{Proximal Policy Optimization (PPO)}
+
+PPO is an on-policy actor-critic algorithm that directly learns a parameterized policy $\pi_\theta(a|s)$ while estimating a value function $V(s)$. Unlike DQN, PPO updates the policy using the clipped surrogate objective to prevent destructively large policy updates
+
+(insert formula here)
+
+We configure PPO with a learning rate of $3 \times 10^{-4}$, collecting 1,024 timesteps per update, and performing 10 epochs of minibatch updates with batch size 256. The clipping range is set to 0.2, and we use an entropy coefficient of 0.015 to encourage exploration. PPO trains for 10,000 episodes, directly optimizing the policy to maximize expected compositional quality. The on-policy nature ensures the agent learns from its current policy's behavior, potentially leading to more stable convergence for sequential decision-making in music generation.
+Both RL agents use a Multi-Layer Perceptron (MLP) policy network that processes the flattened observation vector (musical score representation plus remaining beats). The agents receive no musical training data and learn purely from the reward signal defined by our multi-faceted reward function.
+
+\subsection{Baseline Methods}
+
+To contextualize the performance of our RL agents, we implement two supervised learning baselines trained on musical data.
+
+\subsubsection{N-gram Language Model}
+
+We adapt the n-gram language modeling approach to musical sequence generation using NLTK's implementation. The model treats musical actions as tokens and learns conditional probability distributions $P(a_t | a_{t-n+1}, \ldots, a_{t-1})$ from a corpus of collected compositions.
+We use a bigram model ($n=2$) with Laplace smoothing to handle unseen action sequences. The vocabulary consists of all 90 possible actions from our discrete action space plus start and end tokens. Training data comprises rollouts collected from both random and trained RL agents, stored as sequences of action indices.
+During generation, the model samples the next action based on the learned conditional probabilities, constrained to select only valid actions given the remaining beats in the current bar. When the model encounters contexts with no learned transitions, it falls back to uniform sampling over valid actions. This approach provides a probabilistic baseline that captures local sequential patterns in musical composition.
+
+\subsubsection{LSTM Neural Network}
+
+Our LSTM baseline employs a recurrent neural network to model longer-term dependencies in musical sequences. The architecture consists of an embedding layer mapping action indices to dense vectors (128 dimensions), a single-layer LSTM with 256 hidden units and dropout (0.3), followed by a fully-connected output layer producing logits over the action vocabulary.
+The model is trained on the same action sequence dataset using teacher forcing, where at each timestep the model predicts the next action given the previous ground-truth actions. We use cross-entropy loss with padding token masking.
+
+(insert formula here)
+
+Due to the variable and often lengthy compositions in the Nottingham MIDI dataset, we chunk sequences into overlapping segments of 64 actions to facilitate efficient training. The model trains for 20 epochs using Adam optimizer with learning rate $10^{-3}$ and weight decay $10^{-4}$, saving the best model based on validation loss.
+For generation, the LSTM autoregressively samples actions, maintaining hidden state across the composition. Like the n-gram model, action selection is constrained to valid durations given bar boundaries. The LSTM's recurrent architecture enables it to capture longer melodic and rhythmic patterns compared to the Markov assumption of n-grams.
+
+\subsection{Reward Function Design}
+
+The reward function serves as the sole learning signal for our RL agents and plays a critical role in shaping compositional quality. We design a multi-component reward function that evaluates four fundamental aspects of musical structure:
+
+\begin{description}
+  \item[Rhythm Score:] Evaluates temporal structure through five metrics: quarter-beat ratio (notes on strong beats), inter-onset interval stability (rhythmic regularity), entropy of note placement (variety vs. predictability), note density (notes per bar), and syncopation (off-beat emphasis). Target values are derived from musical theory (e.g., 20\% syncopation, entropy near $1.15 \times \log(4)$).
+  \item[Harmony Score:] Assigns per-bar chord labels using a rule-based detector that scores candidate chords based on melodic pitch content, beat position, and duration weighting. Notes matching the detected chord receive +2.0 points, while diatonic non-chord tones (passing tones, neighbor tones, escape tones, appoggiaturas, anticipations, suspensions, retardations, and pedal tones) receive fractional credit (0.5–0.75) based on their melodic function. The score is normalized by the ideal per-note average (1.7).
+  \item[Progression Score:] Evaluates harmonic movement between adjacent bars using a hand-crafted transition matrix encoding music-theoretic voice leading principles in C major. Strong resolutions (e.g., V→I, IV→I) receive weights of +1.0, weak progressions receive +0.3, and unidiomatic movements are penalized with negative weights. Chord qualities (triads vs. sevenths) are mapped to functional roots before lookup.
+  \item[Repetition Score:] Measures structural coherence through n-gram motif analysis (n=2,3,4). Motifs repeated 2–3 times contribute positively, while excessive repetition (4+ occurrences) incurs penalties. Additional bonuses reward motif variety and novelty (unique motifs).
+\end{description}
+
+Additional penalties discourage pathological behaviors discovered during development: bar monotony (uniform durations within bars), sparse early bars (whole notes in opening measures), excessive use of long notes, and poor cadential structure. The final reward is computed as a weighted combination of normalized component scores (each in [0,1]) minus penalties.
+This reward function design reflects a key challenge in applying RL to creative domains: translating subjective aesthetic judgments into quantitative objectives. Our approach combines music-theoretic heuristics with empirical tuning, prioritizing rhythmic and harmonic coherence over strict adherence to training data distributions.
 
 \section{Empirical Studies}
 
