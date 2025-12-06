@@ -53,7 +53,9 @@
 This project focuses on training a Reinforcement Learning (RL) agent to generate musical compositions, of predefined lengths typically 4 to 16 bars, from scratch. Our agent learns purely through trial and error without supervised pre-training as is often used in existing approaches.
 The core challenge lies in creating musically coherent sequences with the reward as the sole guide. Musical quality is reliant upon multiple dimensions, such as rhythm, repetition, melody, harmony, and structural progression. Additionally, music generation differs from standard RL applications because the quality of a composition relies upon the generation of each note and is heavily dependent on its interaction with both previous and subsequent notes. This requires the agent to handle multiple competing objectives simultaneously.
 
-Understanding how an RL agent can learn musicality solely from environmental interaction and reward feedback provides insights into a lesser studied method of artificial music composition.
+There are several reasons why this problem is significant, and you should care about it because, if we look at it from an RL perspective, music generation serves as an excellent testbed for sequential decision making in action spaces with delayed and fine rewards. Musical quality is very multidimensional and subjective, as it often requires careful engineering for the rewards. This is different when we take a look at typical RL benchmarks with success metrics that are clear, such as game scores. 
+
+Understanding how an RL agent can learn musicality solely from environmental interaction and reward feedback provides insights into a lesser-studied method of artificial music composition.
 It allows for direct comparison of this technique against more well-established traditional methods, such as supervised and unsupervised learning with deep neural networks.
 Exploring the capabilities of RL agents in composing meaningful musical sequences is also transferable to studying RL methods. It allows analyzing long-term dependency and self-referential problems, which are impactful in real-world planning and control systems.
 
