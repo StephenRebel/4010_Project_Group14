@@ -88,7 +88,7 @@ We frame the generation process as a constrained Markov Decision Process (MDP) d
 
 \section{Approaches}
 
-We implemented and compared three distinct approaches to musical composition generation: two reinforcement learning methods (Deep Q-Networks and Proximal Policy Optimization) and two baseline methods (N-gram language models and LSTM neural networks). Each approach operates within the same constrained environment but differs fundamentally in its learning strategy.
+We implemented and compared four distinct approaches to musical composition generation: two reinforcement learning methods (Deep Q-Networks and Proximal Policy Optimization) and two baseline methods (N-gram language models and LSTM neural networks). Each approach operates within the same constrained environment but differs fundamentally in its learning strategy.
 
 \subsection{Reinforcement Learning Agents}
 
@@ -96,17 +96,21 @@ Our primary focus lies in training RL agents from scratch to generate musical co
 
 \subsubsection{Deep Q-Network (DQN)}
 
-DQN is a value-based off-policy algorithm that learns to approximate the action-value function $Q(s, a)$, representing the expected return when taking action $a$ in state $s$ and following the optimal policy thereafter. The algorithm maintains two key components: a replay buffer storing past experiences $(s, a, r, s')$ and a target network to stabilize training. The Q-network is updated by minimizing the temporal difference error.
-
-(insert formula here)
+DQN is a value-based off-policy algorithm that learns to approximate the action-value function $Q(s, a)$, representing the expected return when taking action $a$ in state $s$ and following the optimal policy thereafter. The algorithm maintains two key components: a replay buffer storing past experiences $(s, a, r, s')$ and a target network to stabilize training. The Q-network is updated by minimizing the temporal difference error:
+\[
+\mathcal{L}(\theta) = \mathbb{E}_{(s,a,r,s') \sim \mathcal{D}}\left[\left(r + \gamma \max_{a'} Q_{\text{target}}(s', a') - Q(s, a; \theta)\right)^2\right]
+\]
 
 For our music generation task, we configure DQN with a learning rate of $10^{-4}$, replay buffer size of $10^6$, and $\epsilon$-greedy exploration that anneals from 1.0 to 0.05 over 15\% of training. The agent learns through 20,000 episodes of 8-bar composition generation, with experience replay enabling efficient learning from past compositions. The target network updates every 8,000 steps to maintain training stability. This off-policy approach allows the agent to learn from suboptimal compositions while gradually improving its policy.
 
 \subsubsection{Proximal Policy Optimization (PPO)}
 
-PPO is an on-policy actor-critic algorithm that directly learns a parameterized policy $\pi_\theta(a|s)$ while estimating a value function $V(s)$. Unlike DQN, PPO updates the policy using the clipped surrogate objective to prevent destructively large policy updates
+PPO is an on-policy actor-critic algorithm that directly learns a parameterized policy $\pi_\theta(a|s)$ while estimating a value function $V(s)$. Unlike DQN, PPO updates the policy using the clipped surrogate objective to prevent destructively large policy updates:
+\[
+\mathcal{L}^{\text{CLIP}}(\theta) = \mathbb{E}_t\left[\min\left(r_t(\theta)\hat{A}_t, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right)\right]
+\]
 
-(insert formula here)
+where $r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}$ is the probability ratio and $\hat{A}_t$ is the advantage estimate computed using Generalized Advantage Estimation (GAE) with $\lambda = 0.95$.
 
 We configure PPO with a learning rate of $3 \times 10^{-4}$, collecting 1,024 timesteps per update, and performing 10 epochs of minibatch updates with batch size 256. The clipping range is set to 0.2, and we use an entropy coefficient of 0.015 to encourage exploration. PPO trains for 10,000 episodes, directly optimizing the policy to maximize expected compositional quality. The on-policy nature ensures the agent learns from its current policy's behavior, potentially leading to more stable convergence for sequential decision-making in music generation.
 Both RL agents use a Multi-Layer Perceptron (MLP) policy network that processes the flattened observation vector (musical score representation plus remaining beats). The agents receive no musical training data and learn purely from the reward signal defined by our multi-faceted reward function.
@@ -124,9 +128,10 @@ During generation, the model samples the next action based on the learned condit
 \subsubsection{LSTM Neural Network}
 
 Our LSTM baseline employs a recurrent neural network to model longer-term dependencies in musical sequences. The architecture consists of an embedding layer mapping action indices to dense vectors (128 dimensions), a single-layer LSTM with 256 hidden units and dropout (0.3), followed by a fully-connected output layer producing logits over the action vocabulary.
-The model is trained on the same action sequence dataset using teacher forcing, where at each timestep the model predicts the next action given the previous ground-truth actions. We use cross-entropy loss with padding token masking.
-
-(insert formula here)
+The model is trained on the same action sequence dataset using teacher forcing, where at each timestep the model predicts the next action given the previous ground-truth actions. We use cross-entropy loss with padding token masking:
+\[
+\mathcal{L} = -\sum_{t=1}^{T} \log P(a_t | a_{1:t-1}; \theta)
+\]
 
 Due to the variable and often lengthy compositions in the Nottingham MIDI dataset, we chunk sequences into overlapping segments of 64 actions to facilitate efficient training. The model trains for 20 epochs using Adam optimizer with learning rate $10^{-3}$ and weight decay $10^{-4}$, saving the best model based on validation loss.
 For generation, the LSTM autoregressively samples actions, maintaining hidden state across the composition. Like the n-gram model, action selection is constrained to valid durations given bar boundaries. The LSTM's recurrent architecture enables it to capture longer melodic and rhythmic patterns compared to the Markov assumption of n-grams.
@@ -167,7 +172,7 @@ All five metrics are averaged using empirically tuned weights $(1.8, 1.2, 0.9, 0
 \subsubsection{Harmony Reward}
 
 To evaluate correctness of the harmony, we assign each bar a chord label using a rule-based detector that 
-scores candidate chords according to three factors: Pitch content, beat salience, and note duration weighting. Given the detected chord for a bar, each note contributes to the harmony score as follows:
+scores candidate chords according to three factors: Pitch content, beat salience, and note duration weighting. Given the detected chord for a bar, each note contributes to the harmony score as follows~\cite{piston2011harmony}:
 
 \begin{itemize}
     \item \textbf{Chord tones} receive a reward of $+2.0$, as these tones establish the harmonic identity of the bar and are important to stabilizing the tone.
@@ -194,7 +199,7 @@ R_{\text{harmony}} = \frac{1}{1.7} \cdot \frac{S_{\text{harmony}}}{\#\text{melod
 \subsubsection{Progression Reward}
 
 Harmonies that are of basic correctness are not sufficient enough for generating structured and coherent music, 
-so the progression reward evaluates how well adjacent bars follow harmony motion in appropriate style. \\ The process is as follows: Detect the chord in each bar $b$: $C_b$, map each chord to a functional root to normalize chord qualities, and then finally look up the transition weight $w(C_b \rightarrow C_{b+1})$ describing how strong that motion is.
+so the progression reward evaluates how well adjacent bars follow harmony motion in appropriate style~\cite{kostka2017tonal}. \\ The process is as follows: Detect the chord in each bar $b$: $C_b$, map each chord to a functional root to normalize chord qualities, and then finally look up the transition weight $w(C_b \rightarrow C_{b+1})$ describing how strong that motion is.
 
 The final progression score averages these transition weights:
 \vspace{-4pt}
@@ -321,7 +326,7 @@ During training, we generate 8 bar music compositions, as they are long enough t
 \end{figure}
 
 \begin{table}[ht]
-  \caption{Average composition reward achieved over 5000-trials for differing modelling approaches}
+  \caption{Average composition reward achieved over 5000-trials for differing modeling approaches}
   \label{reward-table}
   \centering
   \begin{tabular}{lllll}
@@ -344,7 +349,7 @@ During training, we generate 8 bar music compositions, as they are long enough t
 
 As seen in Table~\ref{reward-table} PPO achieves the highest average rewards and lowest penalties of any generation method. PPO achieves high harmonic, progression and rhythmic rewards. No method achieves repetition rewards above 0.50, this likely indicates a ceiling due to its computation. PPO likely produces higher reward and more coherent musical compositions as the learned policy represents a distribution of action probabilities in any state maintaining exploration during training. PPO's policy updates are also much more stable than those of DQN enabling long-term musical sequence learning.
 DQN however, tends toward greedy action selection and limits its exploration collapsing into repetitive and low reward sequences.
-The LSTM approach achieves the highest reward among our two non-RL baselines. Interestingly both the n-gram and LSTM methods of generation achieve around 0.66 base reward but LSTM generations are penalized far less, the cause is likely overall structure as will be dicussed further upn qualitative inspection. The trends seen in the reward breakdown mirror those seen in the PPO, albeit lower in average performance, with the exception of the progression reward which non-RL methods seem to perform low in. A possible cause is the fixed training set chord progressions not matching the expected definitions of our reward function.
+The LSTM approach achieves the highest reward among our two non-RL baselines. Interestingly both the n-gram and LSTM methods of generation achieve around 0.66 base reward but LSTM generations are penalized far less, the cause is likely overall structure as will be discussed further upon qualitative inspection. The trends seen in the reward breakdown mirror those seen in the PPO, albeit lower in average performance, with the exception of the progression reward which non-RL methods seem to perform low in. A possible cause is the fixed training set chord progressions not matching the expected definitions of our reward function.
 
 \subsection{Hyperparameter sensitivity}
 
@@ -379,7 +384,7 @@ The LSTM approach achieves the highest reward among our two non-RL baselines. In
 \end{figure}
 
 As can be seen in Figures~\ref{ppo-score}, \ref{dqn-score}, \ref{lstm-score}, \ref{ngram-score}, all method of musical generation learn a reasonable format according to rules of rhythm and repetition with the exception of DQN. PPO is evidently the more successful of our two RL methods composing music with acceptable motifs and reasonable harmonic and progressive properties pleasing to the ear. DQN unfortunately does not appear to produce any such properties, in fact its compositions are comparable to random generations.
-Both of the baselines using standard LSTMS and N-gram techniques produce rhythmically reasonable compositions. The LSTM composition in Figure~\ref{lstm-score} does not present a very diverse piece but it contains strong motifs and excellent harmonic and progressive properties souding quite pleasing. The N-gram composition is more diverse but lacks strong motifs and has overall weaker harmonic and progressive features.
+Both of the baselines using standard LSTMS and N-gram techniques produce rhythmically reasonable compositions. The LSTM composition in Figure~\ref{lstm-score} does not present a very diverse piece but it contains strong motifs and excellent harmonic and progressive properties sounding quite pleasing. The N-gram composition is more diverse but lacks strong motifs and has overall weaker harmonic and progressive features.
 
 These general trends are seen across multiple compositions from each of the methods suggesting consistent these are qualities.
 
@@ -387,19 +392,39 @@ These general trends are seen across multiple compositions from each of the meth
 
 \subsection{Method Outcomes}
 
-We have had some success in designing and environment and reward function capable of a guiding RL agents to learn a policy for the generation of constrained musical compositions. Our PPO agent succeed's in learning a high reward policy however the quality of the compositions as evaluated by human listeners is still not very high. DQN fails entirely to learn, and comparing against supervised baselines LSTSM generation was as successful and pleasing to humans if not exceeding our RL methods.
+We have had some success in designing and environment and reward function capable of a guiding RL agents to learn a policy for the generation of constrained musical compositions. Our PPO agent succeeds in learning a high reward policy however the quality of the compositions as evaluated by human listeners is still not very high. DQN fails entirely to learn, and comparing against supervised baselines LSTSM generation was as successful and pleasing to humans if not exceeding our RL methods.
 
 We have discovered that the final quality relies heavily upon the reward function and as such its design is crucial to the outcome. It is very challenging to completely capture and describe ideal musical structure across its many dimensions in a purely mathematical formula.
 
-\subsection{Future Recomendations}
+\subsection{Future Recommendations}
 
-We recommend future research perform a deeper investigation of the possibility of expressing musical quality mathematically and to docus on actor-critic algorithms like PPO over DQN and other off-policy algorithms.
+We recommend future research perform a deeper investigation of the possibility of expressing musical quality mathematically and to focus on actor-critic algorithms like PPO over DQN and other off-policy algorithms.
 
-We believe it may be of value to focus reward formulas as particular dimensions of musicality, harmony, rhythm, etc. rather than attmepting to represent them all in one reward.
+We believe it may be of value to focus reward formulas as particular dimensions of musicality, harmony, rhythm, etc. rather than attempting to represent them all in one reward.
 
-Additionally we are interested in exploring the application of Reinforcement Learning from Human Feedback (Citations) to music generation, and its use in improving existing supervised and unsepervised learning methods as demonstrated in our baselines and widely supported in existing literature.
+Additionally we are interested in exploring the application of Reinforcement Learning from Human Feedback (Citations) to music generation, and its use in improving existing supervised and unsupervised learning methods as demonstrated in our baselines and widely supported in existing literature.
 
 \section*{References}
 
+\begin{thebibliography}{99}
+
+\bibitem{stable-baselines3}
+Raffin, A., Hill, A., Gleave, A., Kanervisto, A., Ernestus, M., \& Dormann, N. (2021).
+Stable-Baselines3: Reliable Reinforcement Learning Implementations.
+\textit{Journal of Machine Learning Research}, 22(268), 1--8.
+
+\bibitem{piston2011harmony}
+Piston, W. (2011).
+\textit{Harmony} (5th ed.).
+W.W. Norton \& Company.
+ISBN: 978-0393079135.
+
+\bibitem{kostka2017tonal}
+Kostka, S., Payne, D., \& Almén, B. (2017).
+\textit{Tonal Harmony} (8th ed.).
+McGraw-Hill Education.
+ISBN: 978-0078025135.
+
+\end{thebibliography}
 
 \end{document}
