@@ -280,23 +280,35 @@ Secondary metrics included:
 (3) Convergence speed (steps to reach threshold performance)
 (4) Musical diversity (variety in generated compositions)
 
-\subsection{Reinforcement Learning Training Dynamics}
-\subsubsection{Deep Q-Network (DQN)}
+\subsection{Reward Function Validation}
 
-(insert info (observations, figures, numbers, etc...))
+We validate our reward function's calibration by testing it on four well known melodies which were manually encoded in our environment: "Twinkle Twinkle Little Star", "Itsy Bitsy Spider", "Ode to Joy", and "Happy Birthday". 
 
-\subsubsection{Proximal Policy Optimization (PPO)}
+\begin{table}[h]
+  \centering
+  \caption{The reward scores for known melodies (benchmark testing)}
+  \label{benchmarks}
+  \begin{tabular}{lcccccc}
+    \toprule
+    \textbf{Melody} & \textbf{Final} & \textbf{Base} & \textbf{Rhythm} & \textbf{Harmony} & \textbf{Prog.} & \textbf{Rep.} \\
+    \midrule
+    Twinkle Twinkle    & 0.190 & 0.760 & 0.722 & 0.683 & 1.000 & 0.698 \\
+    Itsy Bitsy Spider  & 0.758 & 0.758 & 0.709 & 0.866 & 0.900 & 0.578 \\
+    Ode to Joy         & 0.000 & 0.740 & 0.740 & 0.825 & 0.700 & 0.664 \\
+    Happy Birthday     & 0.000 & 0.746 & 0.721 & 0.922 & 0.800 & 0.498 \\
+    \midrule
+    \textbf{Average} & \textbf{0.237} & \textbf{0.751} & \textbf{0.723} & \textbf{0.824} & \textbf{0.850} & \textbf{0.610} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
-(insert info (observations, figures, numbers, etc...))
-
-\subsection{Baseline Comparison}
-\subsubsection{N-gram Language Model}
-
-(insert info (observations, figures, numbers, etc...))
-
-\subsubsection{LSTM Neural Network}
-
-(insert info (observations, figures, numbers, etc...))
+So, as seen in Table~\ref{benchmarks}, these benchmark results demonstrate that our reward function is highly selective in a way. 
+While all melodies are able to achieve strong base rewards from 0.74 to 0.76, three suffer severe penalties that drop their final scores close to zero.
+\textbf{Twinkle Twinkle} loses 75\% of its base reward because of bar monotony from the repeated quarter notes.
+\textbf{Ode to Joy} and \textbf{Happy Birthday} both receive even more severe penalties, as their final scores drop to zero. This overall indicates violations of our duration variety and structural constraints.
+Then, if we take a look at \textbf{Itsy Bitsy Spider}, with its more varied rhythmic structure (mix of quarter, half, and eighth notes), rests, and balanced structure, it is able to avoid penalties. 
+The average final score of 0.237 also demonstrates a challenging baseline that our RL agent must not only produce musically coherent sequences but also be able to avoid the structural violations that also incur penalties on classic nursery rhymes.
+This, in turn, validates that our penalty terms are working as designed to prevent exploitation patterns.
 
 \subsection{Experimental Setup}
 
@@ -347,7 +359,9 @@ During training, we generate 8 bar music compositions, as they are long enough t
   \end{tabular}
 \end{table}
 
-As seen in Table~\ref{reward-table} PPO achieves the highest average rewards and lowest penalties of any generation method. PPO achieves high harmonic, progression and rhythmic rewards. No method achieves repetition rewards above 0.50, this likely indicates a ceiling due to its computation. PPO likely produces higher reward and more coherent musical compositions as the learned policy represents a distribution of action probabilities in any state maintaining exploration during training. PPO's policy updates are also much more stable than those of DQN enabling long-term musical sequence learning.
+As seen in the Table~\ref{reward-table}, PPO achieves the highest average rewards (0.7148) of any generation method, vastly exceeding even known melodies (benchmark average: 0.237) from Table~\ref{benchmarks}. This result demonstrates that PPO has leanred to generate compositions that satisfy our stric reward function better than traditional nursery rrhymes, primarily through effective penalty avoidance. 
+While known melodies are able to achieve base rewards of 0.74-0.76, they do suffer severe penalties (-0.57 to -0.75). PPO, conversely, earns a positive penalty bonus (+0.024), which indicates that it actively satisfies duration variety requirements.
+PPO achieves high harmonic, progression and rhythmic rewards. No method achieves repetition rewards above 0.50, this likely indicates a ceiling due to its computation. PPO likely produces higher reward and more coherent musical compositions as the learned policy represents a distribution of action probabilities in any state maintaining exploration during training. PPO's policy updates are also much more stable than those of DQN enabling long-term musical sequence learning.
 DQN however, tends toward greedy action selection and limits its exploration collapsing into repetitive and low reward sequences.
 The LSTM approach achieves the highest reward among our two non-RL baselines. Interestingly both the n-gram and LSTM methods of generation achieve around 0.66 base reward but LSTM generations are penalized far less, the cause is likely overall structure as will be discussed further upon qualitative inspection. The trends seen in the reward breakdown mirror those seen in the PPO, albeit lower in average performance, with the exception of the progression reward which non-RL methods seem to perform low in. A possible cause is the fixed training set chord progressions not matching the expected definitions of our reward function.
 
