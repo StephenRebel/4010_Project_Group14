@@ -21,6 +21,8 @@
 
 \author{
   Saagar Gahlot \\
+  XXXXXXXX \\
+  \texttt{EMAIL_XXXXX} \\
   \And
   Stephen Rebel \\
   XXXXXXXX \\
@@ -141,6 +143,8 @@ This reward function design reflects a key challenge in applying RL to creative 
 \section{Empirical Studies}
 
 For each algorithm, we essentially trained multiple agents with different random seeds to assess their consistency. So, we tracked episode rewards throughout the training process and then evaluated the final policies on a test set of generated compositions. We compared four approaches through well-designed experiments (DQN agent, PPO agent, N-gram Baseline, and LSTM Baseline). 
+
+\subsection{Evaluation Metrics}
 For our performance metrics, the primary evaluation metric was the average reward achieved on generated compositions. This allowed the reward to encompass all aspects of musical quality as defined by our reward function. 
 Secondary metrics included: 
 (1) Individual reward component scores (rhythm, harmony, progression, and  repetition)
