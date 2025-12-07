@@ -140,6 +140,32 @@ This reward function design reflects a key challenge in applying RL to creative 
 
 \section{Empirical Studies}
 
+For each algorithm, we essentially trained multiple agents with different random seeds to assess their consistency. So, we tracked episode rewards throughout the training process and then evaluated the final policies on a test set of generated compositions. We compared four approaches through well-designed experiments (DQN agent, PPO agent, N-gram Baseline, and LSTM Baseline). 
+For our performance metrics, the primary evaluation metric was the average reward achieved on generated compositions. This allowed the reward to encompass all aspects of musical quality as defined by our reward function. 
+Secondary metrics included: 
+(1) Individual reward component scores (rhythm, harmony, progression, and  repetition)
+(2) Learning stability (variance in episode rewards)
+(3) Convergence speed (steps to reach threshold performance)
+(4) Musical diversity (variety in generated compositions)
+
+\subsection{Reinforcement Learning Training Dynamics}
+\subsubsection{Deep Q-Network (DQN)}
+
+(insert info (observations, figures, numbers, etc...))
+
+\subsubsection{Proximal Policy Optimization (PPO)}
+
+(insert info (observations, figures, numbers, etc...))
+
+\subsection{Baseline Comparison}
+\subsubsection{N-gram Language Model}
+
+(insert info (observations, figures, numbers, etc...))
+
+\subsubsection{LSTM Neural Network}
+
+(insert info (observations, figures, numbers, etc...))
+
 
 \section{Conclusion}
 
