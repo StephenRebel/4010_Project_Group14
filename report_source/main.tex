@@ -18,6 +18,7 @@
 \usepackage{xcolor}         % colors
 \usepackage{graphicx}
 \usepackage{amsmath}
+\usepackage{subcaption}
 
 \title{COMP 4010 - Reinforcement Learning Group 14 Final Project}
 
@@ -313,50 +314,53 @@ The average final score of 0.237 also demonstrates a challenging baseline that o
 This, in turn, validates that our penalty terms are working as designed to prevent exploitation patterns.
 
 
-\subsection{Reinforcement Learning Training Dynamics}
-\subsubsection{Deep Q-Network (DQN)}
+\subsection{Quantitative Results}
 
-\begin{figure}
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.6\linewidth]{dqn_agent_reward_graph.png}
-    \caption{Average Reward over Episode for DQN Agent}
-    \label{dqn_train}
+
+    % Left image — Reward graph
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{dqn_agent_reward_graph.png}
+        \caption{Average Reward over Episode for DQN}
+    \end{subfigure}
+    \hfill
+    % Right image — Histogram
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{ppo_agent_reward_graph.png}
+        \caption{Average Reward over Episode for PPO}
+    \end{subfigure}
+
+    \caption{Agent Performance for DQN (left) and PPO (right)}
+    \label{reward_graph}
 \end{figure}
 
-As seen in Figure~\ref{dqn_train}, our DQN agent does not seem to learn at all. Through all the episodes, the average reward per episode ranges from between -0.25 to 0, indicating that there is no learning going on. There does not seem to be any trend of the average reward as the episodes progress, and there is massive variance in the reward, as it fluctates greatly between each episode. This is further cemented when looking at the pitch and duration usage histogram on the final policy.
 
-\begin{figure}
-    \centering
-    \includegraphics[width=1\linewidth]{./dqn_music_evaluation_histogram.png}
-    \caption{Histogram of pitches and notes for DQN}
-    \label{dqn_hist}
-\end{figure}
+As seen in Figure~\ref{reward_graph}, our DQN agent does not seem to learn at all. Through all the episodes, the average reward per episode ranges from between -0.25 to 0, indicating that there is no learning going on. There does not seem to be any trend of the average reward as the episodes progress, and there is massive variance in the reward, as it fluctates greatly between each episode. This is further cemented when looking at the pitch and duration usage histogram on the final policy.
 
- As shown in Figure~\ref{dqn_hist}, we can see that the final policy is still completely random. Every single note and duration has about the same usage rate, signifying that the agent has not learned anything at all. This makes sense as DQN is bad with sparse rewards, which is what our environment does. In essence, almost all steps give a 0 reward, and when there finally is a reward, that reward is multiplied by gamma raised to he n'th step, which turns out to be extremely small, since episodes lengths can be up to 128 steps.
+As Figure~\ref{dqn_histogram}, we can see that the final policy is still completely random. Every single note and duration has about the same usage rate, signifying that the agent has not learned anything at all. This makes sense as DQN is bad with sparse rewards, which is what our environment does. In essence, almost all steps give a 0 reward, and when there finally is a reward, that reward is multiplied by gamma raised to he n'th step, which turns out to be extremely small, since episodes lengths can be up to 128 steps.
 
-\subsubsection{Proximal Policy Optimization (PPO)}
-
-\begin{figure}
-    \centering
-    \includegraphics[width=0.6\linewidth]{ppo_agent_reward_graph.png}
-    \caption{Average Reward over Episode for PPO Agent}
-    \label{ppo_train}
-\end{figure}
-
-In contrast, as seen in Figure~\ref{ppo_train}, our PPO agent has a very nice reward curve. In the first 2000 episodes, it spikes to about 0.6, then during the next 8000 episodes, it starts to converge around 0.7. This demonstrates the PPO has found a successful policy capable of achieving a consistent high reward given our reward structure.
+In contrast, our PPO agent has a very nice reward curve. In the first 2000 episodes, it spikes to about 0.6, then during the next 8000 episodes, it starts to converge around 0.7. This demonstrates the PPO has found a successful policy capable of achieving a consistent high reward given our reward structure.
 
 \begin{figure}
     \centering
     \includegraphics[width=1\linewidth]{./ppo_music_evaluation_histogram.png}
-    \caption{Histogram of pitches and notes for PPO}
-    \label{ppo_hist}
+    \caption{Histogram of pitches and durations for PPO}
+    \label{ppo_histogram}
 \end{figure}
 
-This is made even more obvious when analysing the note usage histograms. In Figure~\ref{ppo_hist} we see the specifics of what the agent has learned. We can see that it really favors the notes 79 (G5), 84 (C6) and 77 (F7), as well as the quarter note (1 beat). This shows us that it has successfully learned some distinct features after training, which follows our musical rules as defined in our reward structure. This makes sense, because due to the on-policy nature of PPO, it takes into account the full music composition, and can assign a reward to every note chosen. As a result, PPO can learn across a full musical composition, something that the DQN agent was unable to do.
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{dqn_music_evaluation_histogram.png}
+    \caption{Histogram of pitches and durations for DQN}
+    \label{dqn_histogram}
+\end{figure}
 
-\subsection{Quantitative RL and Baseline Comparison}
+This is made even more obvious when analysing the note usage histograms, as seen in Figure~\ref{ppo_histogram}. We can see the specifics of what the agent has learned. We can see that it really favors the notes 79 (G5), 84 (C6) and 77 (F7), as well as the quarter note (1 beat). This shows us that it has successfully learned some distinct features after training, which follows our musical rules as defined in our reward structure. This makes sense, because due to the on-policy nature of PPO, it takes into account the full music composition, and can assign a reward to every note chosen. As a result, PPO can learn across a full musical composition, something that the DQN agent was unable to do.
 
-\begin{table}
+\begin{table}[ht]
   \caption{Average composition reward achieved over 5000-trials for differing modeling approaches}
   \label{reward-table}
   \centering
@@ -368,7 +372,7 @@ This is made even more obvious when analysing the note usage histograms. In Figu
     \midrule
     Average final reward & 0.7148 & 0.1115 & 0.4722 & 0.4146 \\
     Average base reward & 0.7391 & 0.6313 & 0.6563 & 0.6592 \\
-    Average reward penalty & -0.0243 & -0.5198 & -0.1841 & -0.2446 \\
+    Average reward penalty & +0.0243 & -0.5198 & -0.1841 & -0.2446 \\
     \midrule
     Average rhythm reward & 0.7458 & 0.6028 & 0.6520 & 0.6737 \\
     Average harmony reward & 0.9682 & 0.9129 & 0.8836 & 0.8669 \\
@@ -379,37 +383,61 @@ This is made even more obvious when analysing the note usage histograms. In Figu
 \end{table}
 
 As seen in Table~\ref{reward-table} PPO achieves the highest average rewards and lowest penalties of any generation method. PPO achieves high harmonic, progression and rhythmic rewards. No method achieves repetition rewards above 0.50, this likely indicates a ceiling due to its computation. PPO likely produces higher reward and more coherent musical compositions as the learned policy represents a distribution of action probabilities in any state maintaining exploration during training. PPO's policy updates are also much more stable than those of DQN enabling long-term musical sequence learning.
-
 DQN however, tends toward greedy action selection and limits its exploration collapsing into repetitive and low reward sequences.
-
 The LSTM approach achieves the highest reward among our two non-RL baselines. Interestingly both the n-gram and LSTM methods of generation achieve around 0.66 base reward but LSTM generations are penalized far less, the cause is likely overall structure as will be discussed further upon qualitative inspection. The trends seen in the reward breakdown mirror those seen in the PPO, albeit lower in average performance, with the exception of the progression reward which non-RL methods seem to perform low in. A possible cause is the fixed training set chord progressions not matching the expected definitions of our reward function.
+
+\begin{figure}[htbp]
+    \centering
+
+    \begin{subfigure}[t]{0.32\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{ppo_music_evaluation_histogram_seed1.png}
+        \caption{Seed 1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.32\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{ppo_music_evaluation_histogram_seed2.png}
+        \caption{Seed 2}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.32\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{ppo_music_evaluation_histogram_seed3.png}
+        \caption{Seed 3}
+    \end{subfigure}
+
+    \caption{Different pitch distribution based on different seeds}
+    \label{note_distribution}
+\end{figure}
+
+One question we had was how the policy changed on different runs of the model. We were curious to see if the agent would figure out a 'perfect policy', and create the same song every time. Looking at Figure~\ref{note_distribution} we can see that when running with 3 distinct seeds, the note distribution changes each time. This results in different music being generated each time. While the note distribution changes, the duration does not, so it seems like the agent has found the optimal durations to used, but not quite for the pitches.
 
 \subsection{Hyperparameter sensitivity}
 
-\subsection{Qualitative RL and Baseline Comparison}
+\subsection{Qualitative Results}
 
-\begin{figure}
+\begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{./ppo_sample_score.png}
   \caption{PPO sample score.}
   \label{ppo-score}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{./dqn_sample_score.png}
   \caption{DQN sample score.}
   \label{dqn-score}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{./lstm_sample_score.png}
   \caption{LSTM sample score.}
   \label{lstm-score}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{./ngram_sample_score.png}
   \caption{N-gram sample score.}
@@ -437,23 +465,27 @@ We believe it may be of value to focus reward formulas as particular dimensions 
 
 Additionally we are interested in exploring the application of Reinforcement Learning from Human Feedback (Citations) to music generation, and its use in improving existing supervised and unsupervised learning methods as demonstrated in our baselines and widely supported in existing literature.
 
+\section*{References}
+
 \begin{thebibliography}{99}
 
-  \bibitem[Raffin et~al.(2021)]{stable-baselines3}
-  Raffin, A., Hill, A., Gleave, A., Kanervisto, A., Ernestus, M.\ \& Dormann, N.\ (2021)
-  Stable-Baselines3: Reliable Reinforcement Learning Implementations.
-  {\it Journal of Machine Learning Research} {\bf 22}(268):1--8.
-  
-  \bibitem[Piston(2011)]{piston2011harmony}
-  Piston, W.\ (2011)
-  {\it Harmony} (5th ed.).
-  New York: W.W.\ Norton \& Company.
-  
-  \bibitem[Kostka et~al.(2017)]{kostka2017tonal}
-  Kostka, S., Payne, D.\ \& Almén, B.\ (2017)
-  {\it Tonal Harmony} (8th ed.).
-  New York: McGraw-Hill Education.
-  
-  \end{thebibliography}
+\bibitem{stable-baselines3}
+Raffin, A., Hill, A., Gleave, A., Kanervisto, A., Ernestus, M., \& Dormann, N. (2021).
+Stable-Baselines3: Reliable Reinforcement Learning Implementations.
+\textit{Journal of Machine Learning Research}, 22(268), 1--8.
+
+\bibitem{piston2011harmony}
+Piston, W. (2011).
+\textit{Harmony} (5th ed.).
+W.W. Norton \& Company.
+ISBN: 978-0393079135.
+
+\bibitem{kostka2017tonal}
+Kostka, S., Payne, D., \& Almén, B. (2017).
+\textit{Tonal Harmony} (8th ed.).
+McGraw-Hill Education.
+ISBN: 978-0078025135.
+
+\end{thebibliography}
 
 \end{document}
