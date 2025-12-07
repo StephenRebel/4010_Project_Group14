@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import BaseCallback
-from collections import Counter
 
 class BaseAgent:
     def __init__(self, env):
@@ -62,7 +61,6 @@ class CallbackFunction(BaseCallback):
     
     def plot_episode_rewards(callback, label="Model", smooth=20, filename="graphs/graph.png"):
         rewards = callback.episode_rewards
-        chosen_notes = callback.chosen_notes
 
         #Reward graph
         if len(rewards) >= smooth:
@@ -84,38 +82,3 @@ class CallbackFunction(BaseCallback):
         plt.savefig(reward_filename)
         plt.show()
         plt.close() 
-
-        #Note histogram
-        pitches = [note[0] for note in chosen_notes if note[0] is not None]
-        durations = [note[1] for note in chosen_notes if note[1] is not None]
-        pitch_counts = Counter(pitches)
-        duration_counts = Counter(durations)
-        pitch_values = [pitch_counts.get(p, 0) for p in callback.pitches]
-        duration_values = [duration_counts.get(d, 0) for d in callback.durations]
-
-        plt.figure(figsize=(14, 5))
-        plt.subplot(1, 2, 1)
-        x_positions = np.arange(len(callback.pitches))
-
-        plt.bar(x_positions, pitch_values, color="skyblue", width=0.6)
-        plt.xticks(x_positions, callback.pitches, rotation=45)
-        plt.xlabel("Pitch")
-        plt.ylabel("Count")
-        plt.title("Histogram of All Chosen Pitches")
-
-        # --- Duration histogram ---
-        plt.subplot(1, 2, 2)
-        x_positions = np.arange(len(callback.durations))
-
-        plt.bar(x_positions, duration_values, color="salmon", width=0.6)
-        plt.xticks(x_positions, callback.durations, rotation=45)
-        plt.xlabel("Duration")
-        plt.ylabel("Count")
-        plt.title("Histogram of All Chosen Durations")
-
-        plt.tight_layout()
-
-        hist_filename = filename.replace(".png", "_histogram.png")
-        plt.savefig(hist_filename)
-        plt.show()
-        plt.close()

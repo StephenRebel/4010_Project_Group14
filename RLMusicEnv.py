@@ -518,7 +518,7 @@ class RLMusicBotEnv(gym.Env):
         else:
             duration_variety_score = 0.0
 
-        rhythm_score = float(np.dot(scores, weights) + 0.15 * duration_variety_score) / np.sum(weights) # normalized 0 to 1
+        rhythm_score = (np.dot(scores, weights) + 0.15 * duration_variety_score) / (np.sum(weights) + 0.15) # normalized 0 to 1
 
         # HARMONY REWARD
         # Compute per-note harmony contributions and detect Diatonic Non-Chord Tones
@@ -947,6 +947,7 @@ class RLMusicBotEnv(gym.Env):
             global_duration_penalty +
             structural_penalty
         )
+        total_penalty = np.clip(total_penalty, 0.0, base_reward)
 
         final_reward = base_reward - total_penalty
         final_reward = np.clip(final_reward, 0.0, 1.0)

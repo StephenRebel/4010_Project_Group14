@@ -14,7 +14,9 @@
 \usepackage{nicefrac}       % compact symbols for 1/2, etc.
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}         % colors
-
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{amsmath}
 
 \title{COMP 4010 - Reinforcement Learning Group 14 Final Project}
 
@@ -31,6 +33,10 @@
   \texttt{EMAIL_XXXXX} \\
   \And
   Drax Lindgren \\
+  XXXXXXXX \\
+  \texttt{EMAIL_XXXXX} \\
+  \And
+  Sharav Bali \\
   XXXXXXXX \\
   \texttt{EMAIL_XXXXX} \\
 }
@@ -57,7 +63,7 @@
 This project focuses on training a Reinforcement Learning (RL) agent to generate musical compositions, of predefined lengths typically 4 to 16 bars, from scratch. Our agent learns purely through trial and error without supervised pre-training as is often used in existing approaches.
 The core challenge lies in creating musically coherent sequences with the reward as the sole guide. Musical quality is reliant upon multiple dimensions, such as rhythm, repetition, melody, harmony, and structural progression. Additionally, music generation differs from standard RL applications because the quality of a composition relies upon the generation of each note and is heavily dependent on its interaction with both previous and subsequent notes. This requires the agent to handle multiple competing objectives simultaneously.
 
-There are several reasons why this problem is significant, and you should care about it because, if we look at it from an RL perspective, music generation serves as an excellent testbed for sequential decision making in action spaces with delayed and fine rewards. Musical quality is very multidimensional and subjective, as it often requires careful engineering for the rewards. This is different when we take a look at typical RL benchmarks with success metrics that are clear, such as game scores. 
+This problem is significant for several reasons. In reinforcement learning, music generation serves as an excellent testbed for sequential decision making in action spaces with delayed and fine rewards. Musical quality is very multidimensional and subjective, as it often requires careful engineering for the rewards. This is different when we take a look at typical RL benchmarks with success metrics that are clear, such as game scores. 
 
 Understanding how an RL agent can learn musicality solely from environmental interaction and reward feedback provides insights into a lesser-studied method of artificial music composition.
 It allows for direct comparison of this technique against more well-established traditional methods, such as supervised and unsupervised learning with deep neural networks.
@@ -126,23 +132,113 @@ For generation, the LSTM autoregressively samples actions, maintaining hidden st
 
 \subsection{Reward Function Design}
 
-The reward function serves as the sole learning signal for our RL agents and plays a critical role in shaping compositional quality. We design a multi-component reward function that evaluates four fundamental aspects of musical structure:
+The reward function serves as the sole learning signal for our RL agents and plays a critical role in shaping compositional quality. We design a multi-component reward function that evaluates four fundamental aspects of musical structure: rhythmic coherence, harmonic correctness, functional chord progression, and repetition of notes and motifs. Each element produces a normalized score in $[0,1]$. After combining these components with their respectful weights, we subtract several global penalties designed to prevent musically nonsensical behavior. This results in a final scalar reward our agent attempts to maximize. 
 
-\begin{description}
-  \item[Rhythm Score:] Evaluates temporal structure through five metrics: quarter-beat ratio (notes on strong beats), inter-onset interval stability (rhythmic regularity), entropy of note placement (variety vs. predictability), note density (notes per bar), and syncopation (off-beat emphasis). Target values are derived from musical theory (e.g., 20\% syncopation, entropy near $1.15 \times \log(4)$).
-  \item[Harmony Score:] Assigns per-bar chord labels using a rule-based detector that scores candidate chords based on melodic pitch content, beat position, and duration weighting. Notes matching the detected chord receive +2.0 points, while diatonic non-chord tones (passing tones, neighbor tones, escape tones, appoggiaturas, anticipations, suspensions, retardations, and pedal tones) receive fractional credit (0.5–0.75) based on their melodic function. The score is normalized by the ideal per-note average (1.7).
-  \item[Progression Score:] Evaluates harmonic movement between adjacent bars using a hand-crafted transition matrix encoding music-theoretic voice leading principles in C major. Strong resolutions (e.g., V→I, IV→I) receive weights of +1.0, weak progressions receive +0.3, and unidiomatic movements are penalized with negative weights. Chord qualities (triads vs. sevenths) are mapped to functional roots before lookup.
-  \item[Repetition Score:] Measures structural coherence through n-gram motif analysis (n=2,3,4). Motifs repeated 2–3 times contribute positively, while excessive repetition (4+ occurrences) incurs penalties. Additional bonuses reward motif variety and novelty (unique motifs).
-\end{description}
+\subsubsection{Rhythm Reward} The rhythm reward evaluates temporal structure across the entire sequence. For each note, we convert its onset into a discrete subdivision grid (four subdivisions per quarter note). This representation allows rhythmic structure to be evaluated in a meaningful way, because variations in tempo, expressive timing, as well as bar length all become comparable once the note onsets are expressed as relative positions within this grid. There are five metrics that contribute to the Rhythm Reward:
 
-Additional penalties discourage pathological behaviors discovered during development: bar monotony (uniform durations within bars), sparse early bars (whole notes in opening measures), excessive use of long notes, and poor cadential structure. The final reward is computed as a weighted combination of normalized component scores (each in [0,1]) minus penalties.
+\paragraph{Quarter-beat ratio:}
+We compute the fraction of notes beginning on strong beats by dividing the number of onsets divisible by 4 over the total number of onsets. We do this to encourage alignment with the structure while still allowing syncopation. Notes starting on strong beats give the melody a grounded rhythmic feel, and deviations from the beat create more tension.
+
+\paragraph{Inter-onset interval stability (rhythmic regularity):}
+The inter-onset interval (IOI) is the time difference between the start of one note and the next, providing an important measure of rhythmic spacing as well as temporal regularity.
+Given onset times $\{t_i\}$, we compute IOI variance to measure regularity:
+\vspace{-4pt}
+\[
+s_{\text{IOI}} = 1 - \frac{\mathrm{Var}(t_{i+1} - t_i)}{(\mathbb{E}[t_{i+1}-t_i])^2 + \varepsilon}.
+\]
+Stable IOIs correlate to predictable rhythmic pacing (a common property of human-made melodies) while still allowing intentional deviations.
+
+\paragraph{Entropy:}
+To prevent monotonous or rhythms that are overly chaotic, we compute the entropy of note 
+placements within a bar. A moderate entropy value corresponds to the level of rhythmic variety 
+typically seen in simple melodies, whereas very low entropy signals repetition, and high 
+entropy signals rhythmic noise.
+
+\paragraph{Note density:}
+Melodies must avoid less desirable behaviors such as emitting too many notes (high density) or too few 
+(low density). We therefore reward note counts per bar that fall near an expected range, to stabilize learning and prevent spare or overly dense rhythms. 
+
+\paragraph{Syncopation:}
+The goal is to achieve moderate syncopation, as it is expressive, and encourages off-beat emphasis when it is appropriate to do so, without producing unpredictable accents. It allows more expression in the sequence. To achieve this, we reward deviations from the beat up to a target rate of 20\%.
+
+All five metrics are averaged using empirically tuned weights $(1.8, 1.2, 0.9, 0.8, 1.0)$ to yield the final rhythm score, the fraction of sum of each metric score multiplied by weight over sum of weights.
+
+\subsubsection{Harmony Reward}
+
+To evaluate harmonic correctness, we assign each bar a chord label using a rule-based detector that 
+scores candidate chords according to (1) pitch-class coverage, (2) note durations, and 
+(3) beat salience. Given the detected chord $C_b$ for bar $b$, each note contributes to the harmony 
+score as follows:
+
+\begin{itemize}
+    \item \textbf{Chord tones} receive a reward of $+2.0$. 
+    \textit{These tones establish the harmonic identity of the bar and are fundamental to tonal stability.}
+    \item \textbf{Diatonic non-chord tones} (NCTs) are classified using intervallic relationships 
+    and receive fractional credit depending on melodic function:
+    \begin{itemize}
+        \item Passing tones, neighbor tones, escape tones: $+0.5$
+        \item Appoggiaturas: $+0.75$
+        \item Anticipations: $+0.6$
+        \item Suspensions: $+0.75$, retardations: $+0.65$
+        \item Pedal tones: $+0.6$
+    \end{itemize}
+    \textit{Rewarding NCTs prevents the agent from overfitting to purely chordal melodies, promoting 
+    more expressive, human-like melodic movement.}
+\end{itemize}
+
+These categories match music-theoretic definitions and are detected using local pitch context 
+(previous and next notes) as well as cross-bar chord relationships.
+
+Let $S_{\text{harm}}$ denote the sum of all per-note contributions. We normalize using an ideal 
+maximum per-note value of $1.7$:
+\vspace{-4pt}
+\[
+R_{\text{harm}} = \frac{1}{1.7} \cdot \frac{S_{\text{harm}}}{\#\{\text{melodic notes}\}}.
+\]
+\textit{This prevents chord-heavy bars from disproportionately influencing the total reward.}
+\subsubsection{Harmony Score} Assigns per-bar chord labels using a rule-based detector that scores candidate chords based on melodic pitch content, beat position, and duration weighting. Notes matching the detected chord receive +2.0 points, while diatonic non-chord tones (passing tones, neighbor tones, escape tones, appoggiaturas, anticipations, suspensions, retardations, and pedal tones) receive fractional credit (0.5–0.75) based on their melodic function. The score is normalized by the ideal per-note average (1.7).
+\subsubsection{Progression Score} Evaluates harmonic movement between adjacent bars using a hand-crafted transition matrix encoding music-theoretic voice leading principles in C major. Strong resolutions (e.g., V→I, IV→I) receive weights of +1.0, weak progressions receive +0.3, and unidiomatic movements are penalized with negative weights. Chord qualities (triads vs. sevenths) are mapped to functional roots before lookup.
+\subsubsection{Repetition Score} Measures structural coherence through n-gram motif analysis (n=2,3,4). Motifs repeated 2–3 times contribute positively, while excessive repetition (4+ occurrences) incurs penalties. Additional bonuses reward motif variety and novelty (unique motifs).
+\subsubsection{Penalties} Additional penalties discourage pathological behaviors discovered during development: bar monotony (uniform durations within bars), sparse early bars (whole notes in opening measures), excessive use of long notes, and poor cadential structure. The final reward is computed as a weighted combination of normalized component scores (each in [0,1]) minus penalties.
 This reward function design reflects a key challenge in applying RL to creative domains: translating subjective aesthetic judgments into quantitative objectives. Our approach combines music-theoretic heuristics with empirical tuning, prioritizing rhythmic and harmonic coherence over strict adherence to training data distributions.
 
 \section{Empirical Studies}
 
+\subsection{Experimental Setup}
+
+During our training, we decided to go with 8 bar music compositions, as they are long enough to provide musical complexity, and short enough not to over complicate our environment and prolong training. PPO typically ran for about 1 million time-steps and 20 thousand episodes. We generated 10 random songs for each model.
+
+\subsection{Quantitative Results}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.48\linewidth]{ppo_agent_reward_graph.png}
+    \hfill
+    \includegraphics[width=0.48\linewidth]{dqn_agent_reward_graph.png}
+    \caption{Average Reward over Episodes for PPO (left) and DQN (right)}
+    \label{fig:both-together}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{ppo_music_evaluation_histogram.png}
+    \caption{Histogram of pitches and notes for PPO}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{dqn_music_evaluation_histogram.png}
+    \caption{Histogram of pitches and notes for DQN}
+\end{figure}
+
+
+\subsection{Hyperparameter sensitivity}
+
+\subsection{Qualitative Results}
 
 \section{Conclusion}
 
+\subsection{Common Failures}
 
 \section*{References}
 
