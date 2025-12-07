@@ -1,15 +1,17 @@
 EOS_ID = 320 # Hardcoded env.action_space.n + 1
+NUM_VOLS_DEPRECATED = 4 # Has been removed from environment but would require a complete reworking of baseline models
+VOLUMES_DEPRECATED = [0.4, 0.6, 0.8, 1.0] # Volumes removed, will have to rework baselines
 
 # Analogus to _map_action_to_note and the reverse form the environment
 def action_from_note_id(pitch_id, duration_id, volume_id, env):
-    mult = env.n_durations * env.n_volumes
-    return int(pitch_id * mult + duration_id * env.n_volumes + volume_id)
+    mult = env.n_durations * NUM_VOLS_DEPRECATED
+    return int(pitch_id * mult + duration_id * NUM_VOLS_DEPRECATED + volume_id)
 
 def note_id_from_action(action, env):
-    mult = env.n_durations * env.n_volumes
+    mult = env.n_durations * NUM_VOLS_DEPRECATED
     pitch_id = action // mult
-    duration_id = (action % mult) // env.n_volumes
-    volume_id = action % env.n_volumes
+    duration_id = (action % mult) // NUM_VOLS_DEPRECATED
+    volume_id = action % NUM_VOLS_DEPRECATED
 
     return pitch_id, duration_id, volume_id
 
@@ -21,7 +23,7 @@ def musical_score_to_actions(musical_score, env):
         for (pitch, duration, volume) in bar:
             pitch_id = env.rest_action if pitch is None else env.pitches.index(pitch)
             duration_id = env.durations.index(duration)
-            volume_id = env.volumes.index(volume)
+            volume_id = VOLUMES_DEPRECATED.index(volume)
 
             actions.append(action_from_note_id(pitch_id, duration_id, volume_id, env))
 
@@ -39,7 +41,7 @@ def actions_to_musical_score(actions, env, eos_token=EOS_ID):
         pitch_id, duration_id, volume_id = note_id_from_action(a, env)
         pitch = None if pitch_id == env.rest_action else env.pitches[pitch_id]
         duration = env.durations[duration_id]
-        volume = env.volumes[volume_id]
+        volume = VOLUMES_DEPRECATED[volume_id]
 
         # Handle musical structuring
         if current_bar >= env.bars:
@@ -52,7 +54,7 @@ def actions_to_musical_score(actions, env, eos_token=EOS_ID):
             if current_bar >= env.bars:
                 break
 
-        musical_score[current_bar].append((pitch, duration, volume))
+        musical_score[current_bar].append((pitch, duration))
         current_beats += duration
     
     return musical_score

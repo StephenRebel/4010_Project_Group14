@@ -62,17 +62,49 @@ def test_ngram(env, full_test=False):
         # Avg reward achieved by the ngram model over N_RUNS runs
         print(f"Testing NGRAM over {N_RUNS} sequences...\n")
 
-        rewards = []
+        final_rewards = []
+        base_rewards = []
+        penalties = []
+
+        rhythm_vals = []
+        harmony_vals = []
+        progression_vals = []
+        repetition_vals = []
+
         for i in range(N_RUNS):
             composition_actions = ngram_model.sample_sequence(num_bars=env.bars, random_seed=SEED, env=env)
             music_score = actions_to_musical_score(composition_actions, env, None)
 
-            reward = env._compute_reward(music_score)[0]
-            rewards.append(reward)
+            final_r, breakdown, base_r = env._compute_reward(music_score)
 
-        avg_reward = sum(rewards) / N_RUNS
-        std_dev_reward = np.std(rewards)
-        print(f"Average reward achieved over {N_RUNS} runs: {avg_reward:.4f}, stanardard deviation = +/-{std_dev_reward:.4f}\n")
+            final_rewards.append(final_r)
+            base_rewards.append(base_r)
+            penalties.append(final_r - base_r)
+
+            rhythm_vals.append(breakdown['rhythm'])
+            harmony_vals.append(breakdown['harmony'])
+            progression_vals.append(breakdown['progression'])
+            repetition_vals.append(breakdown['repetition'])
+
+        # averages
+        avg_reward = np.mean(final_rewards)
+        avg_base = np.mean(base_rewards)
+        avg_penalty = np.mean(penalties)
+
+        avg_rhythm = np.mean(rhythm_vals)
+        avg_harmony = np.mean(harmony_vals)
+        avg_progression = np.mean(progression_vals)
+        avg_repetition = np.mean(repetition_vals)
+
+        print(f"Average final reward over {N_RUNS} runs: {avg_reward:.4f}")
+        print(f"Average base reward: {avg_base:.4f}")
+        print(f"Average penalty (final - base): {avg_penalty:.4f}\n")
+
+        print("Breakdown averages:")
+        print(f"\trhythm: {avg_rhythm:.4f}")
+        print(f"\tharmony: {avg_harmony:.4f}")
+        print(f"\tprogression: {avg_progression:.4f}")
+        print(f"\trepetition: {avg_repetition:.4f}")
 
     return avg_reward
 
@@ -116,17 +148,49 @@ def test_lstm(env, full_test=False):
         # Avg reward achieved by the ngram model over N_RUNS runs
         print(f"Testing LSTM over {N_RUNS} sequences...\n")
 
-        rewards = []
+        final_rewards = []
+        base_rewards = []
+        penalties = []
+
+        rhythm_vals = []
+        harmony_vals = []
+        progression_vals = []
+        repetition_vals = []
+
         for i in range(N_RUNS):
             composition_actions = sample_from_lstm(model=lstm_model, env=env, num_bars=env.bars, device=device)
             music_score = actions_to_musical_score(composition_actions, env, None)
 
-            reward = env._compute_reward(music_score)[0]
-            rewards.append(reward)
+            final_r, breakdown, base_r = env._compute_reward(music_score)
 
-        avg_reward = sum(rewards) / N_RUNS
-        std_dev_reward = np.std(rewards)
-        print(f"Average reward achieved over {N_RUNS} runs: {avg_reward:.4f}, stanardard deviation = +/-{std_dev_reward:.4f}\n")
+            final_rewards.append(final_r)
+            base_rewards.append(base_r)
+            penalties.append(final_r - base_r)
+
+            rhythm_vals.append(breakdown['rhythm'])
+            harmony_vals.append(breakdown['harmony'])
+            progression_vals.append(breakdown['progression'])
+            repetition_vals.append(breakdown['repetition'])
+
+        # averages
+        avg_reward = np.mean(final_rewards)
+        avg_base = np.mean(base_rewards)
+        avg_penalty = np.mean(penalties)
+
+        avg_rhythm = np.mean(rhythm_vals)
+        avg_harmony = np.mean(harmony_vals)
+        avg_progression = np.mean(progression_vals)
+        avg_repetition = np.mean(repetition_vals)
+
+        print(f"Average final reward over {N_RUNS} runs: {avg_reward:.4f}")
+        print(f"Average base reward: {avg_base:.4f}")
+        print(f"Average penalty (final - base): {avg_penalty:.4f}\n")
+
+        print("Breakdown averages:")
+        print(f"\trhythm: {avg_rhythm:.4f}")
+        print(f"\tharmony: {avg_harmony:.4f}")
+        print(f"\tprogression: {avg_progression:.4f}")
+        print(f"\trepetition: {avg_repetition:.4f}")
 
     return avg_reward
 

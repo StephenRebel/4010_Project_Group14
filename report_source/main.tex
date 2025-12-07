@@ -15,7 +15,6 @@
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}         % colors
 \usepackage{graphicx}
-\usepackage{float}
 \usepackage{amsmath}
 
 \title{COMP 4010 - Reinforcement Learning Group 14 Final Project}
@@ -296,35 +295,84 @@ Secondary metrics included:
 
 \subsection{Experimental Setup}
 
-During our training, we decided to go with 8 bar music compositions, as they are long enough to provide musical complexity, and short enough not to over complicate our environment and prolong training. PPO typically ran for about 1 million time-steps and 20 thousand episodes. We generated 10 random songs for each model.
+During training, we generate 8 bar music compositions, as they are long enough to provide musical complexity, and short enough not to over complicate our environment and prolong training. PPO typically ran for about 1 million time-steps and 20 thousand episodes. We generated 10 random songs for each model.
 
 \subsection{Quantitative Results}
 
-\begin{figure}[H]
+\begin{figure}[t]
     \centering
-    \includegraphics[width=0.48\linewidth]{ppo_agent_reward_graph.png}
+    \includegraphics[width=0.48\linewidth]{./ppo_agent_reward_graph.png}
     \hfill
-    \includegraphics[width=0.48\linewidth]{dqn_agent_reward_graph.png}
+    \includegraphics[width=0.48\linewidth]{./dqn_agent_reward_graph.png}
     \caption{Average Reward over Episodes for PPO (left) and DQN (right)}
     \label{fig:both-together}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[t]
     \centering
-    \includegraphics[width=1\linewidth]{ppo_music_evaluation_histogram.png}
+    \includegraphics[width=1\linewidth]{./ppo_music_evaluation_histogram.png}
     \caption{Histogram of pitches and notes for PPO}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[t]
     \centering
-    \includegraphics[width=1\linewidth]{dqn_music_evaluation_histogram.png}
+    \includegraphics[width=1\linewidth]{./dqn_music_evaluation_histogram.png}
     \caption{Histogram of pitches and notes for DQN}
 \end{figure}
 
+\begin{table}[t]
+  \caption{Average composition reward achieved over 5000-trials for differing modelling approaches}
+  \label{reward-table}
+  \centering
+  \begin{tabular}{lllll}
+    \toprule
+     & \multicolumn{4}{c}{Generation method} \\
+    \cmidrule(r){2-5}
+    Reward Component & PPO & DQN & LSTM & N-Gram \\
+    \midrule
+    Average final reward & 0.7148 & 0.1115 & 0.4722 & 0.4146 \\
+    Average base reward & 0.7391 & 0.6313 & 0.6563 & 0.6592 \\
+    Average reward penalty & +0.0243 & -0.5198 & -0.1841 & -0.2446 \\
+    \midrule
+    Average rhythm reward & 0.7458 & 0.6028 & 0.6520 & 0.6737 \\
+    Average harmony reward & 0.9682 & 0.9129 & 0.8836 & 0.8669 \\
+    Average progression reward & 0.6410 & 0.4679 & 0.5180 & 0.5011 \\
+    Average repetition reward & 0.5010 & 0.5000 & 0.5022 & 0.5007 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+As seen in Table~\ref{reward-table} PPO achieves the highest average rewards and lowest penalties of any generation method. PPO achieves high harmonic, progression and rhythmic rewards. No method achieves repetition rewards above 0.50, this likely indicates a ceiling due to its computation. PPO likely produces higher reward and more coherent musical compositions as the learned policy represents a distribution of action probabilities in any state maintaining exploration during training. PPO's policy updates are also much more stable than those of DQN enabling long-term musical sequence learning.
+DQN however, tends toward greedy action selection and limits its exploration collapsing into repetitive and low reward sequences.
+The LSTM approach achieves the highest reward among our two non-RL baselines. Interestingly both the n-gram and LSTM methods of generation achieve around 0.66 base reward but LSTM generations are penalized far less, the cause is likely overall structure as will be dicussed further upn qualitative inspection. The trends seen in the reward breakdown mirror those seen in the PPO, albeit lower in average performance, with the exception of the progression reward which non-RL methods seem to perform low in. A possible cause is the fixed training set chord progressions not matching the expected definitions of our reward function.
 
 \subsection{Hyperparameter sensitivity}
 
 \subsection{Qualitative Results}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\linewidth]{./ppo_sample_score.png}
+  \caption{PPO sample score.}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\linewidth]{./dqn_sample_score.png}
+  \caption{DQN sample score.}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\linewidth]{./lstm_sample_score.png}
+  \caption{LSTM figure caption.}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\linewidth]{./ngram_sample_score.png}
+  \caption{N-gram figure caption.}
+\end{figure}
 
 \section{Conclusion}
 
