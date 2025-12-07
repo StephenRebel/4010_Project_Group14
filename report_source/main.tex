@@ -1,5 +1,7 @@
 \documentclass{article}
 
+% Citation stuff
+\PassOptionsToPackage{authoryear,square,comma}{natbib}
 
 % Compile preprint version
 \usepackage[preprint]{neurips_2023}
@@ -16,7 +18,6 @@
 \usepackage{xcolor}         % colors
 \usepackage{graphicx}
 \usepackage{amsmath}
-\usepackage{float}
 
 \title{COMP 4010 - Reinforcement Learning Group 14 Final Project}
 
@@ -93,7 +94,7 @@ We implemented and compared four distinct approaches to musical composition gene
 
 \subsection{Reinforcement Learning Agents}
 
-Our primary focus lies in training RL agents from scratch to generate musical compositions purely through environmental interaction. We employ the Stable-Baselines3 library~\cite{stable-baselines3} to implement two state-of-the-art RL algorithms.
+Our primary focus lies in training RL agents from scratch to generate musical compositions purely through environmental interaction. We employ the Stable-Baselines3 library~\citep{stable-baselines3} to implement two state-of-the-art RL algorithms.
 
 \subsubsection{Deep Q-Network (DQN)}
 
@@ -173,7 +174,7 @@ All five metrics are averaged using empirically tuned weights $(1.8, 1.2, 0.9, 0
 \subsubsection{Harmony Reward}
 
 To evaluate correctness of the harmony, we assign each bar a chord label using a rule-based detector that 
-scores candidate chords according to three factors: Pitch content, beat salience, and note duration weighting. Given the detected chord for a bar, each note contributes to the harmony score as follows~\cite{piston2011harmony}:
+scores candidate chords according to three factors: Pitch content, beat salience, and note duration weighting. Given the detected chord for a bar, each note contributes to the harmony score as follows~\citep{piston2011harmony}:
 
 \begin{itemize}
     \item \textbf{Chord tones} receive a reward of $+2.0$, as these tones establish the harmonic identity of the bar and are important to stabilizing the tone.
@@ -200,7 +201,7 @@ R_{\text{harmony}} = \frac{1}{1.7} \cdot \frac{S_{\text{harmony}}}{\#\text{melod
 \subsubsection{Progression Reward}
 
 Harmonies that are of basic correctness are not sufficient enough for generating structured and coherent music, 
-so the progression reward evaluates how well adjacent bars follow harmony motion in appropriate style~\cite{kostka2017tonal}. \\ The process is as follows: Detect the chord in each bar $b$: $C_b$, map each chord to a functional root to normalize chord qualities, and then finally look up the transition weight $w(C_b \rightarrow C_{b+1})$ describing how strong that motion is.
+so the progression reward evaluates how well adjacent bars follow harmony motion in appropriate style~\citep{kostka2017tonal}. \\ The process is as follows: Detect the chord in each bar $b$: $C_b$, map each chord to a functional root to normalize chord qualities, and then finally look up the transition weight $w(C_b \rightarrow C_{b+1})$ describing how strong that motion is.
 
 The final progression score averages these transition weights:
 \vspace{-4pt}
@@ -285,7 +286,7 @@ Secondary metrics included:
 
 We validate our reward function's calibration by testing it on four well known melodies which were manually encoded in our environment: "Twinkle Twinkle Little Star", "Itsy Bitsy Spider", "Ode to Joy", and "Happy Birthday". 
 
-\begin{table}[h]
+\begin{table}
   \centering
   \caption{The reward scores for known melodies (benchmark testing)}
   \label{benchmarks}
@@ -315,7 +316,7 @@ This, in turn, validates that our penalty terms are working as designed to preve
 \subsection{Reinforcement Learning Training Dynamics}
 \subsubsection{Deep Q-Network (DQN)}
 
-\begin{figure}[H]
+\begin{figure}
     \centering
     \includegraphics[width=0.6\linewidth]{dqn_agent_reward_graph.png}
     \caption{Average Reward over Episode for DQN Agent}
@@ -323,7 +324,7 @@ This, in turn, validates that our penalty terms are working as designed to preve
 
 As seen from the above graph, our DQN agent does not seem to learn at all. Through all the episodes, the average reward per episode ranges from between -0.25 to 0, indicating that there is no learning going on. There does not seem to be any trend of the average reward as the episodes progress, and there is massive variance in the reward, as it fluctates greatly between each episode. This is further cemented when looking at the pitch and duration usage histogram on the final policy.
 
-\begin{figure}[H]
+\begin{figure}
     \centering
     \includegraphics[width=1\linewidth]{./dqn_music_evaluation_histogram.png}
     \caption{Histogram of pitches and notes for DQN}
@@ -333,7 +334,7 @@ As seen from the above graph, our DQN agent does not seem to learn at all. Throu
 
 \subsubsection{Proximal Policy Optimization (PPO)}
 
-\begin{figure}[H]
+\begin{figure}
     \centering
     \includegraphics[width=0.6\linewidth]{ppo_agent_reward_graph.png}
     \caption{Average Reward over Episode for PPO Agent}
@@ -341,7 +342,7 @@ As seen from the above graph, our DQN agent does not seem to learn at all. Throu
 
 In contrast, as seen in the figure above, our PPO agent has a very nice reward curve. In the first 2000 episodes, it spikes to about 0.6, then during the next 8000 episodes, it starts to converge around 0.7. This demonstrates the PPO has found a successful policy capable of achieving a consistent high reward given our reward structure.
 
-\begin{figure}[H]
+\begin{figure}
     \centering
     \includegraphics[width=1\linewidth]{./ppo_music_evaluation_histogram.png}
     \caption{Histogram of pitches and notes for PPO}
@@ -364,7 +365,7 @@ During training, we generate 8 bar music compositions, as they are long enough t
 
 \subsection{Quantitative Results}
 
-\begin{table}[ht]
+\begin{table}
   \caption{Average composition reward achieved over 5000-trials for differing modeling approaches}
   \label{reward-table}
   \centering
@@ -376,7 +377,7 @@ During training, we generate 8 bar music compositions, as they are long enough t
     \midrule
     Average final reward & 0.7148 & 0.1115 & 0.4722 & 0.4146 \\
     Average base reward & 0.7391 & 0.6313 & 0.6563 & 0.6592 \\
-    Average reward penalty & +0.0243 & -0.5198 & -0.1841 & -0.2446 \\
+    Average reward penalty & -0.0243 & -0.5198 & -0.1841 & -0.2446 \\
     \midrule
     Average rhythm reward & 0.7458 & 0.6028 & 0.6520 & 0.6737 \\
     Average harmony reward & 0.9682 & 0.9129 & 0.8836 & 0.8669 \\
@@ -394,28 +395,28 @@ The LSTM approach achieves the highest reward among our two non-RL baselines. In
 
 \subsection{Qualitative Results}
 
-\begin{figure}[t]
+\begin{figure}
   \centering
   \includegraphics[width=0.8\linewidth]{./ppo_sample_score.png}
   \caption{PPO sample score.}
   \label{ppo-score}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}
   \centering
   \includegraphics[width=0.8\linewidth]{./dqn_sample_score.png}
   \caption{DQN sample score.}
   \label{dqn-score}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}
   \centering
   \includegraphics[width=0.8\linewidth]{./lstm_sample_score.png}
   \caption{LSTM sample score.}
   \label{lstm-score}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}
   \centering
   \includegraphics[width=0.8\linewidth]{./ngram_sample_score.png}
   \caption{N-gram sample score.}
@@ -447,23 +448,21 @@ Additionally we are interested in exploring the application of Reinforcement Lea
 
 \begin{thebibliography}{99}
 
-\bibitem{stable-baselines3}
-Raffin, A., Hill, A., Gleave, A., Kanervisto, A., Ernestus, M., \& Dormann, N. (2021).
-Stable-Baselines3: Reliable Reinforcement Learning Implementations.
-\textit{Journal of Machine Learning Research}, 22(268), 1--8.
-
-\bibitem{piston2011harmony}
-Piston, W. (2011).
-\textit{Harmony} (5th ed.).
-W.W. Norton \& Company.
-ISBN: 978-0393079135.
-
-\bibitem{kostka2017tonal}
-Kostka, S., Payne, D., \& Almén, B. (2017).
-\textit{Tonal Harmony} (8th ed.).
-McGraw-Hill Education.
-ISBN: 978-0078025135.
-
-\end{thebibliography}
+  \bibitem[Raffin et~al.(2021)]{stable-baselines3}
+  Raffin, A., Hill, A., Gleave, A., Kanervisto, A., Ernestus, M.\ \& Dormann, N.\ (2021)
+  Stable-Baselines3: Reliable Reinforcement Learning Implementations.
+  {\it Journal of Machine Learning Research} {\bf 22}(268):1--8.
+  
+  \bibitem[Piston(2011)]{piston2011harmony}
+  Piston, W.\ (2011)
+  {\it Harmony} (5th ed.).
+  New York: W.W.\ Norton \& Company.
+  
+  \bibitem[Kostka et~al.(2017)]{kostka2017tonal}
+  Kostka, S., Payne, D.\ \& Almén, B.\ (2017)
+  {\it Tonal Harmony} (8th ed.).
+  New York: McGraw-Hill Education.
+  
+  \end{thebibliography}
 
 \end{document}
