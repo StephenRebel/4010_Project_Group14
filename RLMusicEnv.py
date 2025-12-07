@@ -508,7 +508,17 @@ class RLMusicBotEnv(gym.Env):
         weights = np.array([1.8, 1.2, 0.9, 0.8, 1.0])
         scores = np.array([quarter_beat_ratio, ioi_stability, entropy_score, note_density_score, syncopation_score])
 
-        rhythm_score = float(np.dot(scores, weights)) / np.sum(weights) # normalized 0 to 1
+        durations_used = [d for bar in musical_score for _, d in bar]
+        if durations_used:
+            dur_counter = Counter(durations_used)
+            dur_probs = np.array(list(dur_counter.values())) / len(durations_used)
+            dur_entropy = -np.sum(dur_probs * np.log(dur_probs + 1e-9))
+            max_dur_entropy = np.log(len(self.durations))  # 5 possible durations
+            duration_variety_score = (dur_entropy / (max_dur_entropy + 1e-9)) * 0.12
+        else:
+            duration_variety_score = 0.0
+
+        rhythm_score = float(np.dot(scores, weights) + 0.15 * duration_variety_score) / np.sum(weights) # normalized 0 to 1
 
         # HARMONY REWARD
         # Compute per-note harmony contributions and detect Diatonic Non-Chord Tones
@@ -810,16 +820,6 @@ class RLMusicBotEnv(gym.Env):
                     if count / len(bar_durations) > 0.75 and most_common_dur >= 1.0:
                         bar_monotony_penalty += 0.10
 
-        durations_used = [d for bar in musical_score for _, d in bar]
-        if durations_used:
-            dur_counter = Counter(durations_used)
-            dur_probs = np.array(list(dur_counter.values())) / len(durations_used)
-            dur_entropy = -np.sum(dur_probs * np.log(dur_probs + 1e-9))
-            max_dur_entropy = np.log(len(self.durations))  # 5 possible durations
-            duration_variety_score = (dur_entropy / (max_dur_entropy + 1e-9)) * 0.12
-        else:
-            duration_variety_score = 0.0
-
         # EARLY BAR QUALITY
         early_bar_penalty = 0.0
         # Penalize whole notes in first 2 bars heavily
@@ -941,7 +941,6 @@ class RLMusicBotEnv(gym.Env):
         base_reward = np.clip(base_reward, 0.0, 1.0)
 
         total_penalty = (
-            duration_variety_score + 
             bar_monotony_penalty +
             early_bar_penalty +
             duration_exploit_penalty +
@@ -970,6 +969,7 @@ class RLMusicBotEnv(gym.Env):
             print(f"    - Syncopation:           {syncopation_score:.4f} (weight: 1.0)")
             print(f"    - Total notes played:    {total_notes_played}")
             print(f"    - Avg notes per bar:     {avg_notes_per_bar:.2f} (target: {expect_avg_npb:.1f})")
+            print(f"    - Duration variety score:     {duration_variety_score:.4f}")
             # Harmony detailed breakdown
             print(f"  Harmony:     {harmony_norm:.4f}")
             print(f"    - Total melodic notes:   {total_notes}")
@@ -1007,7 +1007,6 @@ class RLMusicBotEnv(gym.Env):
             print(f"    - Duration exploit penalty:   {duration_exploit_penalty:.4f}")
             print(f"    - Global duration penalty:    {global_duration_penalty:.4f}")
             print(f"    - Structural penalty:         {structural_penalty:.4f}")
-            print(f"    - Duration variety score:     {duration_variety_score:.4f}")
 
             print("="*60 + "\n")
 
