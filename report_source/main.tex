@@ -139,16 +139,16 @@ The reward function serves as the sole learning signal for our RL agents and pla
 \subsubsection{Rhythm Reward} The rhythm reward evaluates temporal structure across the entire sequence. For each note, we convert its onset into a discrete subdivision grid (four subdivisions per quarter note). This representation allows rhythmic structure to be evaluated in a meaningful way, because variations in tempo, expressive timing, as well as bar length all become comparable once the note onsets are expressed as relative positions within this grid. There are five metrics that contribute to the Rhythm Reward:
 
 \paragraph{Quarter-beat ratio:}
-We compute the fraction of notes beginning on strong beats by dividing the number of onsets divisible by 4 over the total number of onsets. We do this to encourage alignment with the structure while still allowing syncopation. Notes starting on strong beats give the melody a grounded rhythmic feel, and deviations from the beat create more tension.
+We compute the fraction of notes beginning on strong beats by dividing the number of onsets divisible by 4 over the total number of onsets. We do this to maintain structure while still allowing syncopation. Notes starting on strong beats give the melody a rhythmic grounding, and deviations from the beat allow for more tension.
 
 \paragraph{Inter-onset interval stability (rhythmic regularity):}
-The inter-onset interval (IOI) is the time difference between the start of one note and the next, providing an important measure of rhythmic spacing as well as temporal regularity.
+The inter-onset interval (IOI) is the time difference between the start of one note and the next, which is an important measure of spacing as well as temporal regularity.
 Given onset times $\{t_i\}$, we compute IOI variance to measure regularity:
 \vspace{-4pt}
 \[
-s_{\text{IOI}} = 1 - \frac{\mathrm{Var}(t_{i+1} - t_i)}{(\mathbb{E}[t_{i+1}-t_i])^2 + \varepsilon}.
+s_{\text{IOI}} = 1 - \frac{\mathrm{Var}(t_{i+1} - t_i)}{(\mathbb{E}[t_{i+1}-t_i])^2 + \varepsilon}
 \]
-Stable IOIs correlate to predictable rhythmic pacing (a common property of human-made melodies) while still allowing intentional deviations.
+Stable IOIs correlate to rhythmic pacing that is predictable, which is a common property of melodies made by humans, while still allowing intentional deviations.
 
 \paragraph{Entropy:}
 To prevent monotonous or rhythms that are overly chaotic, we compute the entropy of note 
@@ -167,15 +167,12 @@ All five metrics are averaged using empirically tuned weights $(1.8, 1.2, 0.9, 0
 
 \subsubsection{Harmony Reward}
 
-To evaluate harmonic correctness, we assign each bar a chord label using a rule-based detector that 
-scores candidate chords according to (1) pitch-class coverage, (2) note durations, and 
-(3) beat salience. Given the detected chord $C_b$ for bar $b$, each note contributes to the harmony 
-score as follows:
+To evaluate correctness of the harmony, we assign each bar a chord label using a rule-based detector that 
+scores candidate chords according to three factors: Pitch content, beat salience, and note duration weighting. Given the detected chord for a bar, each note contributes to the harmony score as follows:
 
 \begin{itemize}
-    \item \textbf{Chord tones} receive a reward of $+2.0$. 
-    \textit{These tones establish the harmonic identity of the bar and are fundamental to tonal stability.}
-    \item \textbf{Diatonic non-chord tones} (NCTs) are classified using intervallic relationships 
+    \item \textbf{Chord tones} receive a reward of $+2.0$, as these tones establish the harmonic identity of the bar and are important to stabilizing the tone.
+    \item \textbf{Diatonic non-chord tones (NCTs)} are classified using intervallic relationships 
     and receive fractional credit depending on melodic function:
     \begin{itemize}
         \item Passing tones, neighbor tones, escape tones: $+0.5$
@@ -184,25 +181,88 @@ score as follows:
         \item Suspensions: $+0.75$, retardations: $+0.65$
         \item Pedal tones: $+0.6$
     \end{itemize}
-    \textit{Rewarding NCTs prevents the agent from overfitting to purely chordal melodies, promoting 
-    more expressive, human-like melodic movement.}
+Rewarding NCTs prevents the agent from overfitting to melodies that are completely chordal, resulting in more expressive and human-like melodic patterns.
 \end{itemize}
 
-These categories match music-theoretic definitions and are detected using local pitch context 
-(previous and next notes) as well as cross-bar chord relationships.
+These categories align with music theory and are detected using previous and next notes as pitch context. To prevent chord-heavy bars from negatively influencing the proportions of the total reward, we calculate our total harmony reward as the following:
 
-Let $S_{\text{harm}}$ denote the sum of all per-note contributions. We normalize using an ideal 
-maximum per-note value of $1.7$:
+Let $S_{\text{harmony}}$ denote the sum of all per-note contributions. We normalize using an ideal maximum per-note value of $1.7$:
 \vspace{-4pt}
 \[
-R_{\text{harm}} = \frac{1}{1.7} \cdot \frac{S_{\text{harm}}}{\#\{\text{melodic notes}\}}.
+R_{\text{harmony}} = \frac{1}{1.7} \cdot \frac{S_{\text{harmony}}}{\#\text{melodic notes}}
 \]
-\textit{This prevents chord-heavy bars from disproportionately influencing the total reward.}
-\subsubsection{Harmony Score} Assigns per-bar chord labels using a rule-based detector that scores candidate chords based on melodic pitch content, beat position, and duration weighting. Notes matching the detected chord receive +2.0 points, while diatonic non-chord tones (passing tones, neighbor tones, escape tones, appoggiaturas, anticipations, suspensions, retardations, and pedal tones) receive fractional credit (0.5–0.75) based on their melodic function. The score is normalized by the ideal per-note average (1.7).
-\subsubsection{Progression Score} Evaluates harmonic movement between adjacent bars using a hand-crafted transition matrix encoding music-theoretic voice leading principles in C major. Strong resolutions (e.g., V→I, IV→I) receive weights of +1.0, weak progressions receive +0.3, and unidiomatic movements are penalized with negative weights. Chord qualities (triads vs. sevenths) are mapped to functional roots before lookup.
-\subsubsection{Repetition Score} Measures structural coherence through n-gram motif analysis (n=2,3,4). Motifs repeated 2–3 times contribute positively, while excessive repetition (4+ occurrences) incurs penalties. Additional bonuses reward motif variety and novelty (unique motifs).
-\subsubsection{Penalties} Additional penalties discourage pathological behaviors discovered during development: bar monotony (uniform durations within bars), sparse early bars (whole notes in opening measures), excessive use of long notes, and poor cadential structure. The final reward is computed as a weighted combination of normalized component scores (each in [0,1]) minus penalties.
-This reward function design reflects a key challenge in applying RL to creative domains: translating subjective aesthetic judgments into quantitative objectives. Our approach combines music-theoretic heuristics with empirical tuning, prioritizing rhythmic and harmonic coherence over strict adherence to training data distributions.
+
+\subsubsection{Progression Reward}
+
+Harmonies that are of basic correctness are not sufficient enough for generating structured and coherent music, 
+so the progression reward evaluates how well adjacent bars follow harmony motion in appropriate style. \\ The process is as follows: Detect the chord in each bar $b$: $C_b$, map each chord to a functional root to normalize chord qualities, and then finally look up the transition weight $w(C_b \rightarrow C_{b+1})$ describing how strong that motion is.
+
+The final progression score averages these transition weights:
+\vspace{-4pt}
+\[
+R_{\text{progression}} =
+\frac{1}{N_{\text{valid}}}
+\sum_{b} w(C_b \rightarrow C_{b+1})
+\]
+where $N_{\text{valid}}$ is the number of valid bar pairs. A valid bar pair means that they have detected chords in the pair. Stronger transitions receive higher weights, meaning there is smooth and coherent movement across bars.
+
+\subsubsection{Repetition Reward}
+
+To structure motifs, we flatten the melody into a sequence of note tokens shaped as $(\text{pitch}, \text{duration})$ and compute $n$-gram motifs for $n \in \{2,3,4\}$. N-grams naturally model short melodic pieces which allow repetition to be detected without requiring complicated segmentation or boundaries. We choose from 2 to 4 as 2 signifies uncommon motifs, and 3-4 note motifs are more common in music theory. For each $n$, we slide an $n$-length window over the melody, and then extract each appropriate $n$-gram as pitch-duration pairs. Finally, we count occurrences of each motif. There are 3 external factors that are taken into account:
+
+\paragraph{Meaningful repetition:} Motifs repeated 2–3 times contribute positively, while excessive repetition ($\ge 4$) provides penalties. This is because human melodies rely on repetition for memorability, but excessive looping results in monotony or the agent cheating the reward.
+
+\paragraph{Variety bonus:} We reward the presence of multiple distinct motifs that repeat multiple times:
+\vspace{-4pt}
+\[
+r_{\text{variety}} = \min \left( 0.3 \cdot \frac{|M_{\text{rep}}|}{|M_{\text{all}}|},\, 0.2 \right)
+\]
+This is rewarded as it encourages diversity of motifs rather than simple pattern copying, which helps to augment the song and make it more complex.
+
+\paragraph{Novelty bonus:} Unique motifs receive an additional bonus. This balances repetition of motifs with creativity that draws interest to the song, rewarding melodies that introduce new ideas without becoming too chaotic.
+
+The final repetition score is capped at $0.75$:
+\vspace{-4pt}
+\[
+R_{\text{repetition}} = \min(r_{\text{motif}} + r_{\text{variety}} + 0.5 r_{\text{novelty}},\, 0.75)
+\]
+
+\subsubsection{Penalties}
+
+Our training revealed several faults including things like long-note exploitation, empty bars, 
+and mechanical rhythms. Due to these faults, we decided to introduce auxiliary penalties:
+
+\begin{itemize}
+    \item \textbf{Bar monotony penalty}: 
+    penalizes bars whose durations are uniform. Without this penalty, the agent frequently converged to trivial solutions using repeated quarter notes.
+    \item \textbf{Early bar quality}: 
+    discourages empty or overly sparse openings, which prevents melodies that begin with long rests or single whole notes.
+    \item \textbf{Long-note exploitation}: 
+    penalizes excessive use of whole notes or consecutive long durations. Implemented as agents quickly learned that long notes maximize harmony score unless penalized.
+    \item \textbf{Duration variety}: 
+    encourages multiple rhythmic values.
+    \item \textbf{Structural penalties}: 
+    penalize weak endings and empty mid-piece bars.
+\end{itemize}
+
+\subsubsection{Final Combination}
+
+All reward component scores are normalized to $[0,1]$ and combined as:\\
+\vspace{-4pt}
+\[
+R_{\text{base}} = 
+0.45\,R_{\text{rhythm}} +
+0.22\,R_{\text{harmony}} +
+0.18\,R_{\text{progression}} +
+0.15\,R_{\text{repetition}}
+\]
+\[
+R_{\text{final}} = \max\left( 0,\, R_{\text{base}} - \text{TotalPenalty} \right)
+\]
+
+The weights were selected specifically to reflect the importance of each musical dimension relative to each other, with rhythm emphasized due to its strong influence on how music is perceived.
+
+This design reflects a broader challenge in applying RL to a domain that relies on creativity rather than simple logic. Having to formalize subjective musical criteria into objectives that we could quantify and have remain learnable was difficult to formulate. Our approach to our reward balances the structure of music theory with elements on tuning, to receive coherent and consistent compositions in terms of melody, harmony, rhythm, and expression.
 
 \section{Empirical Studies}
 
