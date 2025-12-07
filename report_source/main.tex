@@ -385,7 +385,19 @@ These general trends are seen across multiple compositions from each of the meth
 
 \section{Conclusion}
 
-\subsection{Common Failures}
+\subsection{Method Outcomes}
+
+We have had some success in designing and environment and reward function capable of a guiding RL agents to learn a policy for the generation of constrained musical compositions. Our PPO agent succeed's in learning a high reward policy however the quality of the compositions as evaluated by human listeners is still not very high. DQN fails entirely to learn, and comparing against supervised baselines LSTSM generation was as successful and pleasing to humans if not exceeding our RL methods.
+
+We have discovered that the final quality relies heavily upon the reward function and as such its design is crucial to the outcome. It is very challenging to completely capture and describe ideal musical structure across its many dimensions in a purely mathematical formula.
+
+\subsection{Future Recomendations}
+
+We recommend future research perform a deeper investigation of the possibility of expressing musical quality mathematically and to docus on actor-critic algorithms like PPO over DQN and other off-policy algorithms.
+
+We believe it may be of value to focus reward formulas as particular dimensions of musicality, harmony, rhythm, etc. rather than attmepting to represent them all in one reward.
+
+Additionally we are interested in exploring the application of Reinforcement Learning from Human Feedback (Citations) to music generation, and its use in improving existing supervised and unsepervised learning methods as demonstrated in our baselines and widely supported in existing literature.
 
 \section*{References}
 
