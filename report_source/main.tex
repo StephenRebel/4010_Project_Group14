@@ -1,7 +1,7 @@
 \documentclass{article}
 
 % Citation stuff
-\PassOptionsToPackage{authoryear,square,comma}{natbib}
+\PassOptionsToPackage{numbers,compress}{natbib}
 
 % Compile preprint version
 \usepackage[preprint]{neurips_2023}
@@ -91,6 +91,14 @@ We frame the generation process as a constrained Markov Decision Process (MDP) d
 
 \section{Approaches}
 
+\subsection{Prior Works}
+
+Traditional methods of music generation often involve supervised learning and deep neural networks like Long short-term memory (LSTM) models \citep{lstm-paper}. \citet{RNN-finetune} applied Deep Q-RL \citep{dqn-paper} finetuning to an LSTM with a reward function derived from music theory heuristics (rhythm, harmony, etc.). Their goal was to circumvent the traditional purely data driven approach and generate monophonic melodies. Similarly, in \textit{Bach2Bach}, \citet{bach2bach} employ a bi-axial LSTM as an initial probabilistic model to which they apply a Deep Q-Learning Network (DQN) RL approach to improve quality.
+
+A more recent approch discussed by \citet{music-rlhf} employs reinforcement learning from human feedback (RLHF) \citep{rlhf} to a text-to-music autoregressive model. This powerful approach demonstrated significant improvements over their baseline models. \textit{Music Generation using Human-In-The-Loop Reinforcement Learning} \citep{hitlp-paper} is another very recent paper in which the the reseachers apply RLHF to learn music generation. They implement a tabular Q-learning \citep{q-learning} approach in which human raters provide feedback per generation guiding their model to learn subjective human preferences.
+
+(Possibly more and note sure how next paragrpah fits in now)
+
 We implemented and compared four distinct approaches to musical composition generation: two reinforcement learning methods (Deep Q-Networks and Proximal Policy Optimization) and two baseline methods (N-gram language models and LSTM neural networks). Each approach operates within the same constrained environment but differs fundamentally in its learning strategy.
 
 \subsection{Reinforcement Learning Agents}
@@ -99,7 +107,7 @@ Our primary focus lies in training RL agents from scratch to generate musical co
 
 \subsubsection{Deep Q-Network (DQN)}
 
-DQN is a value-based off-policy algorithm that learns to approximate the action-value function $Q(s, a)$, representing the expected return when taking action $a$ in state $s$ and following the optimal policy thereafter. The algorithm maintains two key components: a replay buffer storing past experiences $(s, a, r, s')$ and a target network to stabilize training. The Q-network is updated by minimizing the temporal difference error:
+DQN is a value-based off-policy algorithm that learns to approximate the action-value function $Q(s, a)$, representing the expected return when taking action $a$ in state $s$ and following the optimal policy thereafter \citep{dqn-paper}. The algorithm maintains two key components: a replay buffer storing past experiences $(s, a, r, s')$ and a target network to stabilize training. The Q-network is updated by minimizing the temporal difference error:
 \[
 \mathcal{L}(\theta) = \mathbb{E}_{(s,a,r,s') \sim \mathcal{D}}\left[\left(r + \gamma \max_{a'} Q_{\text{target}}(s', a') - Q(s, a; \theta)\right)^2\right]
 \]
@@ -108,7 +116,7 @@ For our music generation task, we configure DQN with a learning rate of $10^{-4}
 
 \subsubsection{Proximal Policy Optimization (PPO)}
 
-PPO is an on-policy actor-critic algorithm that directly learns a parameterized policy $\pi_\theta(a|s)$ while estimating a value function $V(s)$. Unlike DQN, PPO updates the policy using the clipped surrogate objective to prevent destructively large policy updates:
+PPO is an on-policy actor-critic algorithm that directly learns a parameterized policy $\pi_\theta(a|s)$ while estimating a value function $V(s)$ \citep{ppo-paper}. Unlike DQN, PPO updates the policy using the clipped surrogate objective to prevent destructively large policy updates:
 \[
 \mathcal{L}^{\text{CLIP}}(\theta) = \mathbb{E}_t\left[\min\left(r_t(\theta)\hat{A}_t, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right)\right]
 \]
@@ -124,13 +132,13 @@ To contextualize the performance of our RL agents, we implement two supervised l
 
 \subsubsection{N-gram Language Model}
 
-We adapt the n-gram language modeling approach to musical sequence generation using NLTK's implementation. The model treats musical actions as tokens and learns conditional probability distributions $P(a_t | a_{t-n+1}, \ldots, a_{t-1})$ from a corpus of collected compositions.
+We adapt the n-gram language modeling approach to musical sequence generation using NLTK's implementation. The model treats musical actions as tokens and learns conditional probability distributions $P(a_t | a_{t-n+1}, \ldots, a_{t-1})$ from a corpus of collected compositions \citep{ngram-site}.
 We use a bigram model ($n=2$) with Laplace smoothing to handle unseen action sequences. The vocabulary consists of all 90 possible actions from our discrete action space plus start and end tokens. Training data comprises rollouts collected from both random and trained RL agents, stored as sequences of action indices.
 During generation, the model samples the next action based on the learned conditional probabilities, constrained to select only valid actions given the remaining beats in the current bar. When the model encounters contexts with no learned transitions, it falls back to uniform sampling over valid actions. This approach provides a probabilistic baseline that captures local sequential patterns in musical composition.
 
 \subsubsection{LSTM Neural Network}
 
-Our LSTM baseline employs a recurrent neural network to model longer-term dependencies in musical sequences. The architecture consists of an embedding layer mapping action indices to dense vectors (128 dimensions), a single-layer LSTM with 256 hidden units and dropout (0.3), followed by a fully-connected output layer producing logits over the action vocabulary.
+Our LSTM baseline employs a recurrent neural network to model longer-term dependencies in musical sequences \citep{lstm-paper}. The architecture consists of an embedding layer mapping action indices to dense vectors (128 dimensions), a single-layer LSTM with 256 hidden units and dropout (0.3), followed by a fully-connected output layer producing logits over the action vocabulary.
 The model is trained on the same action sequence dataset using teacher forcing, where at each timestep the model predicts the next action given the previous ground-truth actions. We use cross-entropy loss with padding token masking:
 \[
 \mathcal{L} = -\sum_{t=1}^{T} \log P(a_t | a_{1:t-1}; \theta)
@@ -469,23 +477,81 @@ Additionally we are interested in exploring the application of Reinforcement Lea
 
 \begin{thebibliography}{99}
 
-\bibitem{stable-baselines3}
-Raffin, A., Hill, A., Gleave, A., Kanervisto, A., Ernestus, M., \& Dormann, N. (2021).
-Stable-Baselines3: Reliable Reinforcement Learning Implementations.
-\textit{Journal of Machine Learning Research}, 22(268), 1--8.
+  \bibitem[Hochreiter and Schmidhuber(1997)]{lstm-paper}
+  Hochreiter, S.\ \& Schmidhuber, J.\ (1997)
+  Long Short-Term Memory.
+  {\it Neural Computation}, {\bf 9}(8):1735--1780.
+  \url{10.1162/neco.1997.9.8.1735}
 
-\bibitem{piston2011harmony}
-Piston, W. (2011).
-\textit{Harmony} (5th ed.).
-W.W. Norton \& Company.
-ISBN: 978-0393079135.
+  \bibitem[Kotecha(2018)]{bach2bach}
+  Kotecha, N.\ (2018)
+  Bach2Bach: Generating music using a deep reinforcement learning approach.
+  {\it arXiv preprint arXiv:1812.01060}.
+  \url{https://arXiv.org/abs/1812.01060}
 
-\bibitem{kostka2017tonal}
-Kostka, S., Payne, D., \& Almén, B. (2017).
-\textit{Tonal Harmony} (8th ed.).
-McGraw-Hill Education.
-ISBN: 978-0078025135.
+  \bibitem[Mnih et~al.(2013)]{dqn-paper}
+  Mnih, V., Kavukcuoglu, K., Silver, D., Graves, A., Antonoglou, I., Wierstra, D.\ \& Riedmiller, M.\ (2013)
+  Playing Atari with Deep Reinforcement Learning.
+  {\it arXiv preprint arXiv:1312.5602}.
+  \url{https://arxiv.org/abs/1312.5602}
 
+  \bibitem[Jaques et~al.(2016)]{RNN-finetune}
+  Jaques, N., Gu, S., Turner, R. E.\ \& Eck, D.\ (2016)
+  Generating Music by Fine-Tuning Recurrent Neural Networks with Reinforcement Learning.
+  In {\it Deep Reinforcement Learning Workshop, NIPS 2016}. \\
+  \url{https://research.google.com/pubs/archive/45871.pdf}
+
+  \bibitem[Cideron et~al.(2024)]{music-rlhf}
+  Cideron, G., Girgin, S., Verzetti, M., Vincent, D., Kastelic, M., Borsos, Z., McWilliams, B., Ungureanu, V., Bachem, O., Pietquin, O., Geist, M., Hussenot, L., Zeghidour, N.\ \& Agostinelli, A.\ (2024)
+  MusicRL: Aligning music generation to human preferences.
+  {\it arXiv preprint arXiv:2402.04229}.
+  \url{https://arXiv.org/abs/2402.04229}
+
+  \bibitem[Christiano et~al.(2023)]{rlhf}
+  Christiano, P., Leike, J., Brown, T. B., Martic, M., Legg, S.\ \& Amodei, D.\ (2023)
+  Deep Reinforcement Learning from Human Preferences.
+  {\it arXiv preprint arXiv:1706.03741}.
+  \url{https://arXiv.org/abs/1706.03741}
+
+  \bibitem[Justus(2025)]{hitlp-paper}
+  Justus, A. A.\ (2025)
+  Music generation using human-in-the-loop reinforcement learning.
+  {\it arXiv preprint arXiv:2501.15304}.
+  \url{https://arXiv.org/abs/2501.15304}
+
+  \bibitem[Watkins & Dayan(1992)]{q-learning}
+  Watkins, C.\,J.\,C.\,H.\ \& Dayan, P.\ (1992)
+  Q-Learning.
+  {\it Machine Learning}, {\bf 8}(3--4):279--292.
+  \url{https://link.springer.com/content/pdf/10.1007/BF00992698.pdf}
+
+  \bibitem[Raffin et~al.(2021)]{stable-baselines3}
+  Raffin, A., Hill, A., Gleave, A., Kanervisto, A., Ernestus, M.\ \& Dormann, N.\ (2021)
+  Stable-Baselines3: Reliable Reinforcement Learning Implementations.
+  {\it Journal of Machine Learning Research} {\bf 22}(268):1--8.
+
+  \bibitem[Schulman et~al.(2017)]{ppo-paper}
+  Schulman, J., Wolski, F., Dhariwal, P., Radford, A.\ \& Klimov, O.\ (2017)
+  Proximal Policy Optimization Algorithms.
+  {\it arXiv preprint arXiv:1707.06347}.
+  \url{https://arxiv.org/abs/1707.06347}
+
+  \bibitem[NLTK Development Team(2025)]{ngram-site}
+  NLTK Development Team (2025)
+  NLTK Language Modeling — API reference.
+  \textit{NLTK documentation}.
+  \url{https://www.nltk.org/api/nltk.lm.html}
+
+  \bibitem[Piston(2011)]{piston2011harmony}
+  Piston, W.\ (2011)
+  {\it Harmony} (5th ed.).
+  New York: W.W.\ Norton \& Company.
+  
+  \bibitem[Kostka et~al.(2017)]{kostka2017tonal}
+  Kostka, S., Payne, D.\ \& Almén, B.\ (2017)
+  {\it Tonal Harmony} (8th ed.).
+  New York: McGraw-Hill Education.
+  
 \end{thebibliography}
 
 \end{document}
