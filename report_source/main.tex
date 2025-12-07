@@ -299,7 +299,7 @@ During training, we generate 8 bar music compositions, as they are long enough t
 
 \subsection{Quantitative Results}
 
-\begin{figure}[t]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=0.48\linewidth]{./ppo_agent_reward_graph.png}
     \hfill
@@ -308,19 +308,19 @@ During training, we generate 8 bar music compositions, as they are long enough t
     \label{fig:both-together}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=1\linewidth]{./ppo_music_evaluation_histogram.png}
     \caption{Histogram of pitches and notes for PPO}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=1\linewidth]{./dqn_music_evaluation_histogram.png}
     \caption{Histogram of pitches and notes for DQN}
 \end{figure}
 
-\begin{table}[t]
+\begin{table}[ht]
   \caption{Average composition reward achieved over 5000-trials for differing modelling approaches}
   \label{reward-table}
   \centering
@@ -354,25 +354,34 @@ The LSTM approach achieves the highest reward among our two non-RL baselines. In
   \centering
   \includegraphics[width=0.8\linewidth]{./ppo_sample_score.png}
   \caption{PPO sample score.}
+  \label{ppo-score}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{./dqn_sample_score.png}
   \caption{DQN sample score.}
+  \label{dqn-score}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{./lstm_sample_score.png}
-  \caption{LSTM figure caption.}
+  \caption{LSTM sample score.}
+  \label{lstm-score}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{./ngram_sample_score.png}
-  \caption{N-gram figure caption.}
+  \caption{N-gram sample score.}
+  \label{ngram-score}
 \end{figure}
+
+As can be seen in Figures~\ref{ppo-score}, \ref{dqn-score}, \ref{lstm-score}, \ref{ngram-score}, all method of musical generation learn a reasonable format according to rules of rhythm and repetition with the exception of DQN. PPO is evidently the more successful of our two RL methods composing music with acceptable motifs and reasonable harmonic and progressive properties pleasing to the ear. DQN unfortunately does not appear to produce any such properties, in fact its compositions are comparable to random generations.
+Both of the baselines using standard LSTMS and N-gram techniques produce rhythmically reasonable compositions. The LSTM composition in Figure~\ref{lstm-score} does not present a very diverse piece but it contains strong motifs and excellent harmonic and progressive properties souding quite pleasing. The N-gram composition is more diverse but lacks strong motifs and has overall weaker harmonic and progressive features.
+
+These general trends are seen across multiple compositions from each of the methods suggesting consistent these are qualities.
 
 \section{Conclusion}
 
