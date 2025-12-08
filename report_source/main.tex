@@ -380,7 +380,7 @@ This is made even more obvious when analysing the note usage histograms, as seen
     \midrule
     Average final reward & 0.7148 & 0.1115 & 0.4722 & 0.4146 \\
     Average base reward & 0.7391 & 0.6313 & 0.6563 & 0.6592 \\
-    Average reward penalty & +0.0243 & -0.5198 & -0.1841 & -0.2446 \\
+    Average reward penalty & -0.0243 & -0.5198 & -0.1841 & -0.2446 \\
     \midrule
     Average rhythm reward & 0.7458 & 0.6028 & 0.6520 & 0.6737 \\
     Average harmony reward & 0.9682 & 0.9129 & 0.8836 & 0.8669 \\
@@ -420,7 +420,7 @@ The LSTM approach achieves the highest reward among our two non-RL baselines. In
 
 One question we had was how the policy changed on different runs of the model. We were curious to see if the agent would figure out a 'perfect policy', and create the same song every time. Looking at Figure~\ref{note_distribution} we can see that when running with 3 distinct seeds, the note distribution changes each time. This results in different music being generated each time. While the note distribution changes, the duration does not, so it seems like the agent has found the optimal durations to used, but not quite for the pitches.
 
-\subsection{Hyperparameter sensitivity}
+As seen in Table~\ref{tab:ppo_ablation}, we tested different configurations of the hyperparameters for the PPO agent, to see how they would impact the final reward and general music structure of the compositions. 
 
 \subsection{Qualitative Results}
 
@@ -457,6 +457,25 @@ Both of the baselines using standard LSTMS and N-gram techniques produce rhythmi
 
 These general trends are seen across multiple compositions from each of the methods suggesting consistent these are qualities.
 
+\begin{table}[htbp]
+    \centering
+    \caption{Average reward for PPO Agent tested with different hyperparameters}
+    \label{tab:ppo_ablation}
+    \begin{tabular}{l c c c c c}
+    \toprule
+    \textbf{Configuration} & \textbf{$\gamma$} & \textbf{GAE $\lambda$} & \textbf{ent\_coef} & \textbf{n\_steps} & \textbf{Final Reward} \\
+    \midrule
+    Baseline               & 0.99  & 0.95 & 0.015 & 1024 & 0.7148 $\pm$ 0.08 \\
+    Set A                  & 1.0   & 1.0  & 0.015 & 1024 & 0.7086 $\pm$ 0.04 \\
+    Set B                  & 1.0   & 1.0  & 0.0   & 1024 & 0.7278 $\pm$ 0.03 \\
+    Set C                  & 1.0   & 1.0  & 0.03  & 1024 & 0.7066 $\pm$ 0.06 \\
+    Set D                  & 1.0   & 1.0  & 0.015 & 512  & 0.4985 $\pm$ 0.21 \\
+    \bottomrule
+    \end{tabular}
+\end{table}
+
+We tested the PPO agent against different hyperparameter configurations, as shown in Table ~\ref{tab:ppo_ablation}. The most of the sets, the final average reward varies slightly, however, when looking at the actual music compositions, there are pretty big differences. For example, set A prefers using a lot of 8th notes, and sounds pretty groovy. Set B in contrast, pretty much only uses the same 4 notes in a very repetitive and monotone way. This shows how different hyperparameter effect the reward, and most importantly, and music structure.
+
 \section{Conclusion}
 
 \subsection{Method Outcomes}
@@ -472,8 +491,6 @@ We recommend future research perform a deeper investigation of the possibility o
 We believe it may be of value to focus reward formulas as particular dimensions of musicality, harmony, rhythm, etc. rather than attempting to represent them all in one reward.
 
 Additionally we are interested in exploring the application of Reinforcement Learning from Human Feedback (Citations) to music generation, and its use in improving existing supervised and unsupervised learning methods as demonstrated in our baselines and widely supported in existing literature.
-
-\section*{References}
 
 \begin{thebibliography}{99}
 

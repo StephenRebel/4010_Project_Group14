@@ -28,26 +28,22 @@ ppo_args = {
     "ent_coef": 0.015,
     "vf_coef": 0.5,
     "max_grad_norm": 0.5,
+    "seed": 5,
 }
 
-rewards = []
-base_rewards = []
-breakdowns = []
-components = defaultdict(list)
+# #Train agents
+# dqn_agent = RLAgent(env, agent_type=DQN, args=dqn_args, save_path="./models/dqn_model.zip")
+# dqn_agent.train(max_episodes=10000, filename="graphs/dqn_agent.png")
 
-#Train agents
-dqn_agent = RLAgent(env, agent_type=DQN, args=dqn_args, save_path="./models/dqn_model.zip")
-dqn_agent.train(max_episodes=10000, filename="graphs/dqn_agent.png")
-
-# ppo_agent = RLAgent(env, agent_type=PPO, args=ppo_args, save_path="./models/ppo_model.zip")
-# ppo_agent.train(max_episodes=10000, filename="graphs/ppo_agent.png")
+ppo_agent = RLAgent(env, agent_type=PPO, args=ppo_args, save_path="./models/ppo_model.zip")
+ppo_agent.train(max_episodes=10000, filename="graphs/ppo_agent.png")
 
 #Test agents
-dqn_agent.load("./models/dqn_model.zip")
-dqn_agent.evaluate(n=5000, debug=False, deterministic=False, prefix='dqn_music', save_file=True)
+# dqn_agent.load("./models/dqn_model.zip")
+# dqn_agent.evaluate(n=5000, debug=False, deterministic=False, prefix='dqn_music', save_file=True)
 
-# ppo_agent.load("./models/ppo_model.zip")
-# ppo_agent.evaluate(n=5000, debug=True, deterministic=False, prefix='ppo_music', save_file=True)
+ppo_agent.load("./models/ppo_model.zip")
+ppo_agent.evaluate(n=5000, debug=True, deterministic=False, prefix='ppo_music', save_file=True)
 
 #Random
 #random_agent = RandomAgent(env)
