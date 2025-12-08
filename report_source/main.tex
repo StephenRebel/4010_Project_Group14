@@ -6,7 +6,6 @@
 % Compile preprint version
 \usepackage[preprint]{neurips_2023}
 
-
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
 \usepackage{hyperref}       % hyperlinks
@@ -21,7 +20,6 @@
 \usepackage{subcaption}
 
 \title{COMP 4010 - Reinforcement Learning Group 14 Final Project}
-
 
 \author{
   Saagar Gahlot \\
@@ -45,22 +43,9 @@
   \texttt{EMAIL_XXXXX} \\
 }
 
-
 \begin{document}
 
-
 \maketitle
-
-
-\begin{abstract}
-  The problem of training a Reinforcement Learning Agent to produce short musical compositions from scratch will be addressed. 
-  To address this problem, we designed a Gymnasium environment to train an RL agent by generating musical 
-  compositions and returning feedback through a reward computed over the result. 
-  We then compared multiple different RL methods (Deep Q Networks) and compared the overall outcomes. 
-  This agent was trained from scratch, learning entirely from its experience in our environment and guided by our reward function. 
-  Thus, it is pivotal to produce a meaningful and useful result to design an effective reward function
-\end{abstract}
-
 
 \section{Introduction}
 
@@ -96,6 +81,8 @@ We frame the generation process as a constrained Markov Decision Process (MDP) d
 Traditional methods of music generation often involve supervised learning and deep neural networks like Long short-term memory (LSTM) models \citep{lstm-paper}. \citet{RNN-finetune} applied Deep Q-RL \citep{dqn-paper} finetuning to an LSTM with a reward function derived from music theory heuristics (rhythm, harmony, etc.). Their goal was to circumvent the traditional purely data driven approach and generate monophonic melodies. Similarly, in \textit{Bach2Bach}, \citet{bach2bach} employ a bi-axial LSTM as an initial probabilistic model to which they apply a Deep Q-Learning Network (DQN) RL approach to improve quality.
 
 A more recent approch discussed by \citet{music-rlhf} employs reinforcement learning from human feedback (RLHF) \citep{rlhf} to a text-to-music autoregressive model. This powerful approach demonstrated significant improvements over their baseline models. \textit{Music Generation using Human-In-The-Loop Reinforcement Learning} \citep{hitlp-paper} is another very recent paper in which the the reseachers apply RLHF to learn music generation. They implement a tabular Q-learning \citep{q-learning} approach in which human raters provide feedback per generation guiding their model to learn subjective human preferences.
+
+Important to many of the RL approaches is designing a comprehensive and useful reward function. \citet{rhythm-paper} describe a number of methods for computing mathematical descriptions of the desireability of rhythm, repetition, motif, and transitions among other components in music. They quantify global desireability of a piece from local properties such as note timings, onsets, duration, pattern repetitions.
 
 (Possibly more and note sure how next paragrpah fits in now)
 
@@ -424,32 +411,39 @@ As seen in Table~\ref{tab:ppo_ablation}, we tested different configurations of t
 
 \subsection{Qualitative Results}
 
-\begin{figure}[t]
+\begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.8\linewidth]{./ppo_sample_score.png}
-  \caption{PPO sample score.}
-  \label{ppo-score}
-\end{figure}
+  
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{./ppo_sample_score.png}
+    \caption{PPO sample score.}
+    \label{ppo-score}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{./dqn_sample_score.png}
+    \caption{DQN sample score.}
+    \label{dqn-score}
+  \end{subfigure}
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.8\linewidth]{./dqn_sample_score.png}
-  \caption{DQN sample score.}
-  \label{dqn-score}
-\end{figure}
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{./lstm_sample_score.png}
+    \caption{LSTM sample score.}
+    \label{lstm-score}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{./ngram_sample_score.png}
+    \caption{N-gram sample score.}
+    \label{ngram-score}
+  \end{subfigure}
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.8\linewidth]{./lstm_sample_score.png}
-  \caption{LSTM sample score.}
-  \label{lstm-score}
-\end{figure}
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.8\linewidth]{./ngram_sample_score.png}
-  \caption{N-gram sample score.}
-  \label{ngram-score}
+  \caption{Comparison of sample scores across different generation models.}
+  \label{fig:all-scores}
 \end{figure}
 
 As can be seen in Figures~\ref{ppo-score}, \ref{dqn-score}, \ref{lstm-score}, \ref{ngram-score}, all method of musical generation learn a reasonable format according to rules of rhythm and repetition with the exception of DQN. PPO is evidently the more successful of our two RL methods composing music with acceptable motifs and reasonable harmonic and progressive properties pleasing to the ear. DQN unfortunately does not appear to produce any such properties, in fact its compositions are comparable to random generations.
@@ -541,6 +535,12 @@ Additionally we are interested in exploring the application of Reinforcement Lea
   Q-Learning.
   {\it Machine Learning}, {\bf 8}(3--4):279--292.
   \url{https://link.springer.com/content/pdf/10.1007/BF00992698.pdf}
+
+  \bibitem[Kolic et~al.(2022)]{rhythm-paper}
+  Kolic, B., Rodriguez-Cervantes, M.\,T., Padilla-Longoria, P.\ \& Knights, F.\ (2022)
+  Rhythm and form in music: a complex systems approach.
+  {\it arXiv preprint arXiv:2207.03602}.
+  \url{https://arXiv.org/abs/2207.03602}
 
   \bibitem[Raffin et~al.(2021)]{stable-baselines3}
   Raffin, A., Hill, A., Gleave, A., Kanervisto, A., Ernestus, M.\ \& Dormann, N.\ (2021)
