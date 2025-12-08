@@ -19,7 +19,7 @@
 \usepackage{amsmath}
 \usepackage{subcaption}
 
-\title{COMP 4010 - Reinforcement Learning Group 14 Final Project}
+\title{COMP 4010 - Reinforcement Learning Group 14 Report}
 
 \author{
   Saagar Gahlot \\
@@ -141,7 +141,7 @@ To contextualize the performance of our RL agents, we implement two supervised l
 \subsubsection{N-gram Language Model}
 
 We adapt the n-gram language modeling approach to musical sequence generation using NLTK's implementation. The model treats musical actions as tokens and learns conditional probability distributions $P(a_t | a_{t-n+1}, \ldots, a_{t-1})$ from a corpus of collected compositions \citep{ngram-site}.
-We use a bigram model ($n=2$) with Laplace smoothing to handle unseen action sequences. The vocabulary consists of all 90 possible actions from our discrete action space plus start and end tokens. Training data comprises rollouts collected from both random and trained RL agents, stored as sequences of action indices.
+We use a trigram model ($n=3$) with Laplace smoothing to handle unseen action sequences. The vocabulary consists of all 90 possible actions from our action space plus start and end tokens. The training corpus consists of transformed compoisitions from the Nottingham music dataset \citep{nottingham-dataset}.
 During generation, the model samples the next action based on the learned conditional probabilities, constrained to select only valid actions given the remaining beats in the current bar. When the model encounters contexts with no learned transitions, it falls back to uniform sampling over valid actions. This approach provides a probabilistic baseline that captures local sequential patterns in musical composition.
 
 \subsubsection{LSTM Neural Network}
@@ -152,7 +152,7 @@ The model is trained on the same action sequence dataset using teacher forcing, 
 \mathcal{L} = -\sum_{t=1}^{T} \log P(a_t | a_{1:t-1}; \theta)
 \]
 
-Due to the variable and often lengthy compositions in the Nottingham MIDI dataset, we chunk sequences into overlapping segments of 64 actions to facilitate efficient training. The model trains for 20 epochs using Adam optimizer with learning rate $10^{-3}$ and weight decay $10^{-4}$, saving the best model based on validation loss.
+Due to the variable and often lengthy compositions in the Nottingham MIDI dataset \citep{nottingham-dataset}, we chunk sequences into overlapping segments of 64 actions to facilitate efficient training. The model trains for 20 epochs using Adam optimizer with learning rate $10^{-3}$ and weight decay $10^{-4}$, saving the best model based on validation loss.
 For generation, the LSTM autoregressively samples actions, maintaining hidden state across the composition. Like the n-gram model, action selection is constrained to valid durations given bar boundaries. The LSTM's recurrent architecture enables it to capture longer melodic and rhythmic patterns compared to the Markov assumption of n-grams.
 
 \subsection{Reward Function Design}
@@ -558,6 +558,11 @@ We recommend future research perform a deeper investigation of the possibility o
   NLTK Language Modeling — API reference.
   \textit{NLTK documentation}.
   \url{https://www.nltk.org/api/nltk.lm.html}
+
+  \bibitem[Nottingham Dataset(2009)]{nottingham-dataset}
+  Nottingham Music Dataset (2009)
+  Nottingham Music Database: a collection of British and American folk songs ($\approx$1200 tunes, ABC/MIDI).
+  \url{http://ifdo.ca/~seymour/nottingham/nottingham_database.zip}
 
   \bibitem[Piston(2011)]{piston2011harmony}
   Piston, W.\ (2011)
